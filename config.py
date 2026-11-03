@@ -1,0 +1,66 @@
+"""Configuración del sistema de señales.
+
+Cada valor se puede cambiar sin tocar el código, creando una variable con el
+mismo nombre en GitHub (Settings > Secrets and variables > Actions > Variables).
+"""
+import os
+
+
+def _num(nombre, defecto):
+    valor = os.getenv(nombre, "").strip()
+    if not valor:
+        return defecto
+    try:
+        return type(defecto)(float(valor))
+    except ValueError:
+        return defecto
+
+
+# --- Mercado ---
+NUM_PARES = _num("NUM_PARES", 10)              # pares de mayor volumen a vigilar
+DIAS_HISTORIA = _num("DIAS_HISTORIA", 365)     # historial para el backtest
+EXCLUIR = [s.strip().upper() for s in os.getenv("EXCLUIR", "USDC_USDT").split(",") if s.strip()]
+
+# --- Costos (MEXC futuros USDT-M operados por API, orden a mercado = taker) ---
+# Desde el 1/6/2026 las órdenes de futuros por API pagan 0.08 % taker
+# (anuncio oficial de MEXC). El backtest usa ese costo porque el bot opera por API.
+COMISION_TAKER = _num("COMISION_TAKER", 0.0008)   # 0.08 % por lado
+DESLIZAMIENTO = _num("DESLIZAMIENTO", 0.0003)     # 0.03 % por lado, prudente
+
+# --- Gestión de la operación ---
+ATR_STOP = _num("ATR_STOP", 1.5)          # stop = 1.5 x ATR(14)
+RATIO_BENEFICIO = _num("RATIO_BENEFICIO", 2.0)  # take profit = 2 x distancia del stop
+VELAS_MAXIMAS = _num("VELAS_MAXIMAS", 48)  # cierre por tiempo: 48 velas de 1h
+
+# --- Tamaño de posición ---
+RIESGO_POR_OPERACION_USD = _num("RIESGO_POR_OPERACION_USD", 1.0)  # pérdida si toca el stop
+APALANCAMIENTO = _num("APALANCAMIENTO", 3)
+
+# --- Operación automática ---
+# apagado  = no opera; simulado = solo en papel;
+# auto     = papel hasta que el historial demuestre ventaja, luego real (recomendado);
+# real     = opera siempre en real (los frenos de abajo siguen activos).
+MODO = os.getenv("MODO", "auto").strip().lower() or "auto"
+MIN_SENALES_PARA_REAL = _num("MIN_SENALES_PARA_REAL", 30)  # cerradas en papel
+VENTANA_PAUSA = 20               # si las últimas 20 cerradas pierden en promedio, vuelve a papel
+MAX_POSICIONES = _num("MAX_POSICIONES", 2)
+LIMITE_PERDIDA_DIARIA = _num("LIMITE_PERDIDA_DIARIA", 3.0)    # USD
+LIMITE_PERDIDA_MENSUAL = _num("LIMITE_PERDIDA_MENSUAL", 10.0)  # USD
+
+# --- Filtro de calidad: solo se envían señales con ventaja comprobada ---
+MIN_OPERACIONES = _num("MIN_OPERACIONES", 30)        # en todo el historial
+MIN_OPERACIONES_OOS = _num("MIN_OPERACIONES_OOS", 8)  # en el tramo fuera de muestra
+MIN_FACTOR_BENEFICIO = _num("MIN_FACTOR_BENEFICIO", 1.15)
+# Estadístico t de la expectativa: con 2.0, solo ~0.6 % de estrategias sobre
+# precios aleatorios pasan el filtro (medido con 180 simulaciones).
+MIN_T = _num("MIN_T", 2.0)
+FRACCION_EN_MUESTRA = 0.70  # 70 % del historial para evaluar, 30 % para confirmar
+
+# --- Panel ---
+INTERVALO_MIN = 15  # cada cuánto corre el análisis (debe coincidir con el workflow)
+DIR_DATOS = os.getenv("DIR_DATOS", "docs/data")
+
+# --- Avisos ---
+ZONA_HORARIA = os.getenv("ZONA_HORARIA", "America/Guayaquil")
+HORA_RESUMEN = _num("HORA_RESUMEN", 8)   # hora local del resumen diario
+MAX_DISTANCIA_ATR = 0.5  # si el precio se alejó más de 0.5 ATR de la entrada, no entrar
