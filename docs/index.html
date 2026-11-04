@@ -16,15 +16,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
-/* Layout: terminal de trading. Barra fija arriba, franja de indicadores, señales
-   activas, y debajo radar (lista de pares) + detalle del par en dos columnas
-   desde 1100px; en el celular todo en una columna. */
+/* Layout: terminal de trading. Barra fija, franja de pares, escenario principal
+   (gráfico grande + ficha de la operación posible), matriz de setups, estado del
+   bot y pestañas de resultados. Una columna en el celular. */
 :root {
-  --bg: #0b1016; --surface: #111922; --surface-2: #16212c; --line: #1f2c39;
-  --fg: #dfe7ef; --muted: #8494a5; --faint: #4d5d6d;
-  --accent: #e9b44c; --accent-ink: #1a1305; --accent-soft: rgba(233,180,76,.14);
-  --up: #2fc08b; --up-soft: rgba(47,192,139,.14); --down: #f05a6b; --down-soft: rgba(240,90,107,.14);
-  --ema50: #6c9bd2;
+  --bg: #0a0f15; --surface: #10171f; --surface-2: #151f29; --line: #1e2a36;
+  --fg: #e0e8f0; --muted: #8392a3; --faint: #4a5a6a;
+  --accent: #e9b44c; --accent-soft: rgba(233,180,76,.14);
+  --up: #2fc08b; --up-soft: rgba(47,192,139,.2); --down: #f05a6b; --down-soft: rgba(240,90,107,.2);
+  --ema50: #6c9bd2; --vol: rgba(131,146,163,.28);
   --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -33,20 +33,20 @@
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #eef1f4; --surface: #ffffff; --surface-2: #f5f7f9; --line: #dbe1e8;
-    --fg: #111a23; --muted: #5a6878; --faint: #a3afbb;
-    --accent: #b27a0e; --accent-ink: #fff8ea; --accent-soft: rgba(178,122,14,.12);
-    --up: #0d9a66; --up-soft: rgba(13,154,102,.11); --down: #d23649; --down-soft: rgba(210,54,73,.1);
-    --ema50: #3c6fb0;
+    --bg: #edf0f3; --surface: #ffffff; --surface-2: #f4f6f8; --line: #dbe1e8;
+    --fg: #111a23; --muted: #596777; --faint: #a3afbb;
+    --accent: #b27a0e; --accent-soft: rgba(178,122,14,.12);
+    --up: #0d9a66; --up-soft: rgba(13,154,102,.13); --down: #d23649; --down-soft: rgba(210,54,73,.12);
+    --ema50: #3c6fb0; --vol: rgba(89,103,119,.22);
     color-scheme: light;
   }
 }
 :root[data-theme="light"] {
-  --bg: #eef1f4; --surface: #ffffff; --surface-2: #f5f7f9; --line: #dbe1e8;
-  --fg: #111a23; --muted: #5a6878; --faint: #a3afbb;
-  --accent: #b27a0e; --accent-ink: #fff8ea; --accent-soft: rgba(178,122,14,.12);
-  --up: #0d9a66; --up-soft: rgba(13,154,102,.11); --down: #d23649; --down-soft: rgba(210,54,73,.1);
-  --ema50: #3c6fb0;
+  --bg: #edf0f3; --surface: #ffffff; --surface-2: #f4f6f8; --line: #dbe1e8;
+  --fg: #111a23; --muted: #596777; --faint: #a3afbb;
+  --accent: #b27a0e; --accent-soft: rgba(178,122,14,.12);
+  --up: #0d9a66; --up-soft: rgba(13,154,102,.13); --down: #d23649; --down-soft: rgba(210,54,73,.12);
+  --ema50: #3c6fb0; --vol: rgba(89,103,119,.22);
   color-scheme: light;
 }
 html.standalone { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -57,10 +57,8 @@ body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-a
 .up { color: var(--up); } .down { color: var(--down); } .muted { color: var(--muted); }
 button { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 
-.wrap { max-width: 1320px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-
-/* Barra superior */
 .top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
 .top .wrap { display: flex; align-items: center; gap: 12px; padding-block: 10px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; }
@@ -71,141 +69,150 @@ button { font: inherit; color: inherit; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 3px var(--up-soft); flex: none; }
 .dot.warn { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .dot.bad { background: var(--down); box-shadow: 0 0 0 3px var(--down-soft); }
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; font-size: 12.5px; }
+.btn:hover { border-color: var(--faint); }
 .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; white-space: nowrap; }
 .chip.long { background: var(--up-soft); color: var(--up); }
 .chip.short { background: var(--down-soft); color: var(--down); }
 .chip.neutral { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
 .chip.accent { background: var(--accent-soft); color: var(--accent); }
-.demo-banner { background: var(--accent-soft); color: var(--fg); border-bottom: 1px solid var(--line); font-size: 13px; }
-.demo-banner .wrap { padding-block: 8px; }
-.demo-banner b { color: var(--accent); }
+.demo-banner { background: var(--accent-soft); border-bottom: 1px solid var(--line); font-size: 13px; }
+.demo-banner .wrap { padding-block: 8px; } .demo-banner b { color: var(--accent); }
 
-main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding-block: 18px 40px; }
+main { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; padding-block: 14px 40px; }
 .label { font: 600 11px/1.2 var(--f-body); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
 h2 { margin: 0; font: 700 15px/1.2 var(--f-display); font-stretch: 112%; text-transform: uppercase; letter-spacing: .04em; text-wrap: balance; }
 .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .sec-head p { margin: 0; color: var(--muted); font-size: 12.5px; }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+.empty { padding: 22px 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 4px; }
+.empty b { color: var(--fg); font-weight: 600; }
 
-/* Indicadores */
+/* Franja de pares */
+.strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.pchip { flex: none; display: grid; grid-template-columns: auto auto; gap: 2px 10px; align-items: center; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; text-align: left; min-width: 132px; }
+.pchip[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.pchip b { font: 700 14px/1 var(--f-display); font-stretch: 108%; }
+.pchip .num { font-size: 12px; text-align: right; }
+.pchip .bar { grid-column: 1 / -1; display: flex; gap: 2px; margin-top: 4px; }
+.pchip .bar i { height: 4px; flex: 1; border-radius: 2px; background: var(--surface-2); }
+.pchip .bar i.on { background: var(--muted); } .pchip .bar.go i.on { background: var(--accent); }
+.pchip .bar.lista i.on { background: var(--up); }
+
+/* Escenario principal */
+.stage { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 14px; align-items: start; }
+@media (max-width: 1080px) { .stage { grid-template-columns: minmax(0, 1fr); } }
+.chart-card { overflow: hidden; }
+.c-head { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: flex-end; padding: 14px 16px 10px; }
+.c-title { display: grid; gap: 4px; margin-right: auto; }
+.c-title b { font: 750 28px/1 var(--f-display); font-stretch: 112%; }
+.c-title b small { font: 500 13px var(--f-body); color: var(--muted); margin-left: 4px; }
+.c-title .num { font-size: 16px; }
+.stat { display: grid; gap: 2px; } .stat .num { font-size: 13.5px; }
+.c-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 0 16px 10px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: none; border: 0; padding: 5px 12px; font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface-2); color: var(--fg); }
+.toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.tg { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.tg[aria-pressed="true"] { color: var(--fg); border-color: var(--faint); background: var(--surface-2); }
+.chart-main { position: relative; height: 440px; border-top: 1px solid var(--line); }
+.chart-rsi { position: relative; height: 110px; border-top: 1px solid var(--line); }
+@media (max-width: 600px) { .chart-main { height: 340px; } .chart-rsi { height: 90px; } .c-title b { font-size: 24px; } }
+.legend { position: absolute; left: 12px; top: 8px; z-index: 2; display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); pointer-events: none; }
+.legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 4px; }
+.legend .z { width: 10px; height: 10px; border-radius: 2px; }
+.c-note { padding: 8px 16px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
+
+/* Ficha de operación posible */
+.plan { display: grid; gap: 0; overflow: hidden; }
+.plan > div { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+.plan > div:last-child { border-bottom: 0; }
+.stabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.stab { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px; cursor: pointer; text-align: left; display: grid; gap: 6px; min-width: 0; }
+.stab[aria-pressed="true"] { border-color: var(--accent); }
+.stab span { font-size: 11.5px; font-weight: 600; line-height: 1.2; }
+.verdict { display: flex; gap: 10px; align-items: flex-start; }
+.verdict .ring { flex: none; }
+.verdict b { display: block; font: 700 16px/1.2 var(--f-display); font-stretch: 108%; }
+.verdict p { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.ladder { display: grid; grid-template-columns: auto 1fr auto; gap: 8px 12px; align-items: center; }
+.ladder .lv { font-size: 15px; text-align: right; }
+.ladder .pct { font-size: 12px; text-align: right; }
+.ladder .tick { width: 10px; height: 10px; border-radius: 2px; }
+.rr { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.rr i:first-child { background: var(--down); } .rr i:last-child { background: var(--up); }
+.kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.kv div { display: grid; gap: 2px; } .kv .num { font-size: 13.5px; }
+.conds { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 7px; font-size: 13px; }
+.conds li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; align-items: start; color: var(--muted); }
+.conds li.ok { color: var(--fg); } .conds svg { width: 16px; height: 16px; margin-top: 1px; }
+.why { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* Matriz de setups */
+.mx { overflow-x: auto; }
+.mx table { width: 100%; border-collapse: collapse; min-width: 560px; }
+.mx th { text-align: left; font: 600 11px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.mx td { padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.mx tr:last-child td { border-bottom: 0; }
+.cell { width: 100%; background: none; border: 1px solid transparent; border-radius: 8px; padding: 6px 8px; display: grid; gap: 5px; cursor: pointer; text-align: left; }
+.cell:hover { border-color: var(--line); background: var(--surface-2); }
+.cell.sel { border-color: var(--accent); }
+.cell .top2 { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--muted); }
+.segs { display: flex; gap: 3px; } .segs i { flex: 1; height: 6px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); }
+.segs i.on { background: var(--muted); border-color: transparent; }
+.segs.go i.on { background: var(--accent); } .segs.lista i.on { background: var(--up); }
+.mx .pair b { font: 700 14px/1 var(--f-display); font-stretch: 105%; }
+.trend { font-size: 11.5px; color: var(--muted); } .trend.alcista { color: var(--up); } .trend.bajista { color: var(--down); }
+
+/* Indicadores, bot, señales */
 .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
 .kpi { background: var(--surface); padding: 14px 16px; display: grid; gap: 6px; min-width: 0; }
-.kpi .v { font: 600 24px/1.1 var(--f-mono); font-variant-numeric: tabular-nums; }
+.kpi .v { font: 600 22px/1.1 var(--f-mono); font-variant-numeric: tabular-nums; }
 .kpi .s { font-size: 12.5px; color: var(--muted); }
-.mbar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: var(--surface-2); margin-top: 4px; }
-.mbar i { display: block; }
-@media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi .v { font-size: 20px; } }
-
-/* Bot */
+@media (max-width: 760px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpi .v { font-size: 19px; } }
 .bot { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
 .bot > div { padding: 14px 16px; display: grid; gap: 8px; align-content: start; border-right: 1px solid var(--line); min-width: 0; }
 .bot > div:last-child { border-right: 0; }
 @media (max-width: 900px) { .bot { grid-template-columns: repeat(2, minmax(0, 1fr)); } .bot > div:first-child { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--line); } .bot > div:nth-child(3) { border-right: 0; } .bot > div:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); } }
 .bot-modo { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.bot-modo b { font: 750 20px/1 var(--f-display); font-stretch: 112%; letter-spacing: .02em; }
+.bot-modo b { font: 750 20px/1 var(--f-display); font-stretch: 112%; }
 .bot p { margin: 0; color: var(--muted); font-size: 13px; }
 .gauge { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.gauge i { display: block; height: 100%; background: var(--accent); }
-.gauge.loss i { background: var(--down); }
-.bot .v { font: 600 17px/1.1 var(--f-mono); font-variant-numeric: tabular-nums; }
-.bot .s { font-size: 12px; color: var(--muted); }
-
-/* Señales activas */
+.gauge i { display: block; height: 100%; background: var(--accent); } .gauge.loss i { background: var(--down); }
+.bot .v { font: 600 17px/1.1 var(--f-mono); } .bot .s { font-size: 12px; color: var(--muted); }
 .signals { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.sig { padding: 14px 16px; display: grid; gap: 12px; border-left: 3px solid var(--up); cursor: pointer; text-align: left; background: var(--surface); border-top: 1px solid var(--line); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); border-radius: var(--r); }
+.sig { padding: 14px 16px; display: grid; gap: 12px; cursor: pointer; text-align: left; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--up); border-radius: var(--r); }
 .sig.short { border-left-color: var(--down); }
 .sig-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sig-top .pair { font: 700 17px/1 var(--f-display); font-stretch: 108%; }
 .sig-top .when { margin-left: auto; font-size: 12px; color: var(--muted); }
-.sig .sig-strat { font-size: 12.5px; color: var(--muted); margin-top: -6px; }
+.sig-strat { font-size: 12.5px; color: var(--muted); margin-top: -6px; }
 .levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.levels div { display: grid; gap: 2px; min-width: 0; }
-.levels .num { font-size: 13.5px; overflow-wrap: anywhere; }
+.levels div { display: grid; gap: 2px; min-width: 0; } .levels .num { font-size: 13.5px; overflow-wrap: anywhere; }
 .track { position: relative; height: 22px; }
 .track .rail { position: absolute; left: 0; right: 0; top: 9px; height: 4px; border-radius: 2px; background: linear-gradient(90deg, var(--down-soft), var(--surface-2) 33.3%, var(--up-soft)); }
-.track .tick { position: absolute; top: 4px; width: 2px; height: 14px; background: var(--accent); left: 33.333%; transform: translateX(-1px); }
+.track .tk { position: absolute; top: 4px; width: 2px; height: 14px; background: var(--accent); left: 33.333%; }
 .track .now { position: absolute; top: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--fg); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--fg); transform: translateX(-7px); transition: left .6s ease; }
 .sig-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--muted); }
 .sig-foot .r { font: 600 18px/1 var(--f-mono); }
-.empty { padding: 22px 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 4px; }
-.empty b { color: var(--fg); font-weight: 600; }
 
-/* Radar + detalle */
-.split { display: grid; grid-template-columns: minmax(0, 400px) minmax(0, 1fr); gap: 18px; align-items: start; }
-@media (max-width: 1100px) { .split { grid-template-columns: minmax(0, 1fr); } }
-.radar { overflow: hidden; }
-.radar-head, .row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.15fr); gap: 10px; align-items: center; padding: 10px 14px; }
-.radar-head { border-bottom: 1px solid var(--line); }
-.radar-head .label:nth-child(2) { text-align: right; }
-.row { width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; text-align: left; position: relative; }
-.row:last-child { border-bottom: 0; }
-.row:hover { background: var(--surface-2); }
-.row[aria-current="true"] { background: var(--surface-2); }
-.row[aria-current="true"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
-.row .sym { display: grid; gap: 3px; min-width: 0; }
-.row .sym b { font: 700 15px/1 var(--f-display); font-stretch: 105%; }
-.row .sym b small { font: 500 11px var(--f-body); color: var(--muted); margin-left: 2px; }
-.row .px { text-align: right; display: grid; gap: 3px; min-width: 0; }
-.row .px .num { font-size: 13.5px; white-space: nowrap; }
-@media (max-width: 440px) { .row .px .num { font-size: 12px; } .radar-head, .row { padding-inline: 10px; gap: 8px; } }
-.row .px small { font: 500 12px var(--f-mono); }
-.setup { display: grid; gap: 4px; min-width: 0; }
-.setup .name { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.pips { display: flex; gap: 3px; align-items: center; }
-.pips i { width: 100%; max-width: 18px; height: 6px; border-radius: 2px; background: var(--surface-2); border: 1px solid var(--line); }
-.pips i.on { background: var(--muted); border-color: transparent; }
-.pips.go i.on { background: var(--accent); }
-.pips .ok { margin-left: 4px; font-size: 11px; font-weight: 600; color: var(--accent); white-space: nowrap; }
-.trend { font-size: 11.5px; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
-.trend.alcista { color: var(--up); } .trend.bajista { color: var(--down); }
-
-.detail { display: grid; gap: 0; overflow: hidden; }
-.d-head { padding: 14px 16px; display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: flex-end; border-bottom: 1px solid var(--line); }
-.d-head .title { display: grid; gap: 4px; margin-right: auto; }
-.d-head .title b { font: 750 26px/1 var(--f-display); font-stretch: 112%; }
-.d-head .title .num { font-size: 15px; }
-.stat { display: grid; gap: 2px; }
-.stat .num { font-size: 14px; }
-.chart-box { position: relative; height: 360px; border-bottom: 1px solid var(--line); }
-@media (max-width: 600px) { .chart-box { height: 290px; } }
-.legend { position: absolute; left: 12px; top: 10px; z-index: 2; display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); pointer-events: none; }
-.legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 4px; }
-.chart-note { padding: 8px 16px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--line); }
-.strats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
-@media (max-width: 860px) { .strats { grid-template-columns: minmax(0, 1fr); } }
-.strat { padding: 14px 16px; display: grid; gap: 10px; align-content: start; border-right: 1px solid var(--line); min-width: 0; }
-.strat:last-child { border-right: 0; }
-@media (max-width: 860px) { .strat { border-right: 0; border-bottom: 1px solid var(--line); } .strat:last-child { border-bottom: 0; } }
-.strat-top { display: flex; align-items: center; gap: 8px; justify-content: space-between; flex-wrap: wrap; }
-.strat-top b { font-weight: 600; }
-.conds { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
-.conds li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; align-items: start; color: var(--muted); }
-.conds li.ok { color: var(--fg); }
-.conds svg { width: 16px; height: 16px; margin-top: 1px; }
-.mini { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
-.mini div { display: grid; gap: 1px; }
-.mini .num { font-size: 13px; }
-.why { font-size: 12px; color: var(--muted); }
-
-/* Pestañas inferiores */
+/* Pestañas */
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding: 0 8px; overflow-x: auto; }
 .tab { background: none; border: 0; padding: 12px 10px; color: var(--muted); font-weight: 600; font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
 .tab[aria-selected="true"] { color: var(--fg); border-bottom-color: var(--accent); }
 .tab-body { padding: 14px 16px; display: grid; gap: 14px; }
 .scroll-x { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-th { text-align: left; font: 600 11px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-tr:last-child td { border-bottom: 0; }
-td.r, th.r { text-align: right; }
-.res { font-weight: 600; font-size: 12px; }
+table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
+.t th { text-align: left; font: 600 11px var(--f-body); letter-spacing: .07em; text-transform: uppercase; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.t td { padding: 9px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.t tr:last-child td { border-bottom: 0; }
+.t .r { text-align: right; }
 .equity { height: 220px; position: relative; }
 .sum-row { display: flex; flex-wrap: wrap; gap: 10px 26px; }
-.foot { color: var(--muted); font-size: 12.5px; display: grid; gap: 6px; padding-top: 6px; }
+.foot { color: var(--muted); font-size: 12.5px; display: grid; gap: 8px; }
 .foot p { margin: 0; max-width: 80ch; }
-.btn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface-2); cursor: pointer; font-size: 12.5px; }
-.btn:hover { border-color: var(--faint); }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
 <header class="top">
@@ -218,9 +225,35 @@ td.r, th.r { text-align: right; }
     <button class="btn" id="refresh" type="button">Actualizar</button>
   </div>
 </header>
-<div class="demo-banner" id="demo" hidden><div class="wrap"><b>Datos de demostración.</b> Precios simulados para mostrar el panel. Cuando el sistema corra en GitHub verás aquí el mercado real de MEXC.</div></div>
+<div class="demo-banner" id="demo" hidden><div class="wrap"><b>Datos de demostración.</b> Precios simulados para mostrar el panel. Cuando el sistema corre en GitHub ves aquí el mercado real de MEXC.</div></div>
 
 <main class="wrap">
+  <nav class="strip" id="strip" aria-label="Pares vigilados"></nav>
+
+  <section class="stage" aria-label="Gráfico y operación posible">
+    <div class="panel chart-card">
+      <div class="c-head" id="c-head"></div>
+      <div class="c-tools">
+        <div class="seg" role="group" aria-label="Temporalidad"><button type="button" data-tf="1" aria-pressed="true">1H</button><button type="button" data-tf="4" aria-pressed="false">4H</button></div>
+        <div class="toggles">
+          <button class="tg" type="button" data-t="niveles" aria-pressed="true">Operación posible</button>
+          <button class="tg" type="button" data-t="ema" aria-pressed="true">EMA 20/50</button>
+          <button class="tg" type="button" data-t="vol" aria-pressed="true">Volumen</button>
+          <button class="tg" type="button" data-t="hist" aria-pressed="true">Entradas históricas</button>
+        </div>
+      </div>
+      <div class="chart-main"><div class="legend" id="legend"></div><div id="chart" style="position:absolute;inset:0"></div></div>
+      <div class="chart-rsi"><div class="legend"><span>RSI 14 · zonas 30 / 70</span></div><div id="rsi" style="position:absolute;inset:0"></div></div>
+      <div class="c-note" id="c-note"></div>
+    </div>
+    <aside class="panel plan" id="plan" aria-label="Operación posible"></aside>
+  </section>
+
+  <section aria-labelledby="h-mx">
+    <div class="sec-head"><h2 id="h-mx">Setups en formación</h2><p>Cuántas condiciones cumple cada estrategia en cada par · toca una celda para verla</p></div>
+    <div class="panel mx"><table id="mx"></table></div>
+  </section>
+
   <section class="kpis" id="kpis" aria-label="Resumen"></section>
 
   <section aria-labelledby="h-bot">
@@ -232,26 +265,6 @@ td.r, th.r { text-align: right; }
     <div class="sec-head"><h2 id="h-act">Señales activas</h2><p id="act-note"></p></div>
     <div class="signals" id="activas"></div>
   </section>
-
-  <div class="split">
-    <section aria-labelledby="h-radar">
-      <div class="sec-head"><h2 id="h-radar">Radar</h2><p>10 pares con más volumen · 1h</p></div>
-      <div class="panel radar">
-        <div class="radar-head"><span class="label">Par</span><span class="label">Precio · 24h</span><span class="label">Setup más avanzado</span></div>
-        <div id="radar"></div>
-      </div>
-    </section>
-
-    <section aria-labelledby="h-det">
-      <div class="sec-head"><h2 id="h-det">Detalle</h2><p id="det-note">Toca un par del radar</p></div>
-      <div class="panel detail">
-        <div class="d-head" id="d-head"></div>
-        <div class="chart-box"><div class="legend"><span><i style="background:var(--accent)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span><span>▲▼ señales históricas</span></div><div id="chart" style="position:absolute;inset:0"></div></div>
-        <div class="chart-note" id="chart-note"></div>
-        <div class="strats" id="strats"></div>
-      </div>
-    </section>
-  </div>
 
   <section class="panel" aria-label="Resultados">
     <div class="tabs" role="tablist">
@@ -265,14 +278,12 @@ td.r, th.r { text-align: right; }
     <div class="tab-body" role="tabpanel" id="p-bt" aria-labelledby="t-bt" hidden>
       <div class="sum-row" id="bt-sum"></div>
       <div><div class="label" style="margin-bottom:6px">Curva acumulada de las estrategias aprobadas (en R, con comisiones)</div><div class="equity" id="equity"></div></div>
-      <div class="scroll-x"><table id="bt-table"></table></div>
+      <div class="scroll-x"><table class="t" id="bt-table"></table></div>
     </div>
     <div class="tab-body" role="tabpanel" id="p-cfg" aria-labelledby="t-cfg" hidden></div>
   </section>
 
-  <footer class="foot">
-    <p>Herramienta de análisis, no asesoría financiera. Las estadísticas describen el pasado; el mercado puede cambiar. Opera solo con dinero que puedas perder.</p>
-  </footer>
+  <footer class="foot"><p>Herramienta de análisis, no asesoría financiera. Las estadísticas describen el pasado; el mercado puede cambiar. Opera solo con dinero que puedas perder.</p></footer>
 </main>
 
 <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -280,320 +291,303 @@ td.r, th.r { text-align: right; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  let D = null, sel = null, vivo = {}, vivoOk = null;
-  let chart = null, sCandle = null, sE20 = null, sE50 = null, priceLines = [];
-  let eqChart = null, eqSeries = null;
+  let D = null, sel = null, vivo = {}, vivoOk = null, tf = 1;
+  const estSel = {};               // estrategia elegida por par
+  const vis = { niveles: true, ema: true, vol: true, hist: true };
   let zona = "America/Guayaquil";
+  let chart, sC, sE20, sE50, sVol, sTP, sSL, rsiChart, sRsi, lines = [], eqChart, eqS, sync = false;
 
   // ---------- formato ----------
   const dec = (p) => (!p || !isFinite(p)) ? 2 : Math.min(10, Math.max(2, 3 - Math.floor(Math.log10(Math.abs(p)))));
   const px = (p) => (p == null || !isFinite(p)) ? "–" : Number(p).toLocaleString("en-US", { minimumFractionDigits: dec(p), maximumFractionDigits: dec(p) });
   const pc = (x, d = 1) => (x >= 0 ? "+" : "") + (x * 100).toFixed(d) + "%";
   const R = (x) => (x == null ? "–" : (x >= 0 ? "+" : "") + Number(x).toFixed(2) + "R");
+  const usd = (x) => (x >= 0 ? "+" : "−") + "$" + Math.abs(x || 0).toFixed(2);
   const cls = (x) => (x > 0 ? "up" : x < 0 ? "down" : "muted");
-  const fecha = (iso, opt) => new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }, opt)).format(new Date(iso));
+  const fecha = (iso, o) => new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }, o)).format(new Date(iso));
   const hora = (iso) => fecha(iso, { day: undefined, month: undefined });
-  const hace = (iso) => {
-    const m = Math.round((Date.now() - new Date(iso)) / 60000);
-    if (m < 1) return "hace instantes";
-    if (m < 60) return `hace ${m} min`;
-    const h = Math.floor(m / 60);
-    return h < 24 ? `hace ${h} h ${m % 60} min` : `hace ${Math.floor(h / 24)} d`;
-  };
-  const vol = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + " B" : v >= 1e6 ? (v / 1e6).toFixed(1) + " M" : v.toFixed(0);
-  const base = (par) => par.replace("_USDT", "");
-  const precioDe = (par) => vivo[par] ?? (D.pares.find((p) => p.par === par) || {}).precio;
+  const hace = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); if (m < 1) return "hace instantes"; if (m < 60) return `hace ${m} min`; const h = Math.floor(m / 60); return h < 24 ? `hace ${h} h ${m % 60} min` : `hace ${Math.floor(h / 24)} d`; };
+  const vol = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + " B" : v >= 1e6 ? (v / 1e6).toFixed(1) + " M" : (v || 0).toFixed(0);
+  const base = (p) => p.replace("_USDT", "");
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const par = (p) => D.pares.find((x) => x.par === p);
+  const precioDe = (p) => vivo[p] ?? (par(p) || {}).precio;
   const check = (ok) => ok
     ? '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--accent-soft)"/><path d="M4.8 8.2l2.1 2.1 4.3-4.6" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>'
     : '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" fill="none" stroke="var(--faint)" stroke-width="1.4" stroke-dasharray="2.2 2"/></svg>';
-  const lado = (l) => l === 1 ? '<span class="chip long">▲ LONG</span>' : '<span class="chip short">▼ SHORT</span>';
+  const ladoChip = (l) => l === 1 ? '<span class="chip long">▲ LONG</span>' : '<span class="chip short">▼ SHORT</span>';
+  const segs = (e, cl = "segs") => `<div class="${cl} ${e.senal && e.aprobada ? "lista" : e.aprobada ? "go" : ""}">${Array.from({ length: e.total }, (_, i) => `<i class="${i < e.cumplidas ? "on" : ""}"></i>`).join("")}</div>`;
+  const ring = (k, n, color) => { const r = 19, c = 2 * Math.PI * r, f = n ? k / n : 0; return `<svg class="ring" width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="5"/><circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 24 24)"/><text x="24" y="28" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="var(--fg)">${k}/${n}</text></svg>`; };
+  const mejor = (p) => { const w = (e) => (e.senal && e.aprobada ? 3 : 0) + (e.aprobada ? 1 : 0) + e.cumplidas / e.total; return p.estrategias.slice().sort((a, b) => w(b) - w(a))[0]; };
+  const estrategia = (p) => p.estrategias.find((e) => e.clave === estSel[p.par]) || mejor(p);
 
-  // ---------- estado de la conexión ----------
+  // ---------- estado ----------
   function pintarEstado() {
     if (!D) return;
     const min = (Date.now() - new Date(D.generado)) / 60000;
     const tipo = min < D.intervalo_min * 2.2 ? "" : min < D.intervalo_min * 6 ? "warn" : "bad";
-    const vivoTxt = vivoOk ? " · precio en vivo" : "";
-    $("status").innerHTML = `<span class="dot ${tipo}"></span><span>Análisis ${hace(D.generado)} · próximo ${hora(D.proxima)}${vivoTxt}</span>`;
+    $("status").innerHTML = `<span class="dot ${tipo}"></span><span>Análisis ${hace(D.generado)} · próximo ${hora(D.proxima)}${vivoOk ? " · precio en vivo" : ""}</span>`;
   }
 
-  // ---------- indicadores ----------
-  function pintarKpis() {
-    const rd = D.rendimiento, ap = D.backtest.filter((b) => b.aprobada).length;
-    const t = { alcista: 0, bajista: 0, lateral: 0 };
-    D.pares.forEach((p) => t[p.tendencia]++);
-    const n = D.pares.length || 1;
-    $("kpis").innerHTML = `
-      <div class="kpi"><span class="label">Señales activas</span><span class="v">${D.activas.length}</span><span class="s">${D.activas.length ? "seguimiento cada " + D.intervalo_min + " min" : "esperando un setup aprobado"}</span></div>
-      <div class="kpi"><span class="label">Resultado de las señales</span><span class="v ${cls(rd.total_r)}">${rd.n ? R(rd.total_r) : "–"}</span><span class="s">${rd.n ? `${rd.n} cerradas · ${Math.round(rd.acierto * 100)}% acierto · ≈ $${(rd.total_r * D.config.riesgo_usd).toFixed(2)}` : "aún sin señales cerradas"}</span></div>
-      <div class="kpi"><span class="label">Estrategias con ventaja</span><span class="v">${ap}<span class="muted" style="font-size:.6em"> / ${D.backtest.length}</span></span><span class="s">pasan el filtro estadístico hoy</span></div>
-      <div class="kpi"><span class="label">Tendencia 4h</span><span class="v" style="font-size:16px;line-height:1.5"><span class="up">${t.alcista} ▲</span> <span class="muted">·</span> <span class="down">${t.bajista} ▼</span> <span class="muted">·</span> <span class="muted">${t.lateral} ◆</span></span>
-        <div class="mbar"><i style="width:${t.alcista / n * 100}%;background:var(--up)"></i><i style="width:${t.lateral / n * 100}%;background:var(--faint)"></i><i style="width:${t.bajista / n * 100}%;background:var(--down)"></i></div></div>`;
+  // ---------- franja de pares ----------
+  function pintarStrip() {
+    const orden = D.pares.slice().sort((a, b) => { const w = (p) => { const e = mejor(p); return (e.senal && e.aprobada ? 10 : 0) + (e.aprobada ? 2 : 0) + e.cumplidas / e.total; }; return w(b) - w(a) || b.volumen24 - a.volumen24; });
+    $("strip").innerHTML = orden.map((p) => { const e = mejor(p); return `<button class="pchip" type="button" data-par="${esc(p.par)}" aria-pressed="${p.par === sel}">
+      <b>${esc(base(p.par))}</b><span class="num ${cls(p.cambio24)}">${pc(p.cambio24)}</span>
+      <span class="num muted" style="font-size:12px">${px(precioDe(p.par))}</span><span class="trend ${p.tendencia}" style="text-align:right">${p.tendencia === "alcista" ? "▲" : p.tendencia === "bajista" ? "▼" : "◆"}</span>
+      ${segs(e, "bar")}</button>`; }).join("");
+    $("strip").querySelectorAll(".pchip").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par)));
   }
 
-  // ---------- señales activas ----------
-  function posicion(s, p) {
-    // escala: stop = 0 %, entrada = 33.3 %, objetivo = 100 %
-    const rango = Math.abs(s.objetivo - s.stop);
-    const v = s.lado === 1 ? (p - s.stop) / rango : (s.stop - p) / rango;
-    return Math.max(0, Math.min(1, v)) * 100;
-  }
-  function rActual(s, p) {
-    const costo = (D.config.comision + D.config.deslizamiento) * (s.entrada + p);
-    return (s.lado * (p - s.entrada) - costo) / s.riesgo;
-  }
-  function pintarActivas() {
-    const box = $("activas");
-    $("act-note").textContent = D.activas.length ? "Toca una para verla en el gráfico" : "";
-    if (!D.activas.length) {
-      box.innerHTML = `<div class="panel empty" style="grid-column:1/-1"><b>No hay señales abiertas.</b><span>Cuando una estrategia aprobada se active, aparecerá aquí con su seguimiento y te llegará el aviso por Telegram.</span></div>`;
-      return;
-    }
-    box.innerHTML = D.activas.map((s) => {
-      const p = precioDe(s.par), r = rActual(s, p);
-      const abierta = Date.now() < new Date(s.t_limite);
-      return `<button class="sig ${s.lado === 1 ? "" : "short"}" data-par="${esc(s.par)}" type="button">
-        <div class="sig-top"><span class="pair">${esc(base(s.par))}</span>${lado(s.lado)}${(s.real || {}).estado === "abierta" ? '<span class="chip accent">REAL</span>' : '<span class="chip neutral">PAPEL</span>'}<span class="when">${hace(s.creada)}</span></div>
-        <div class="sig-strat">${esc(s.nombre)} · ${s.stats.n} ops, ${Math.round(s.stats.acierto * 100)}% acierto, ${R(s.stats.exp_r)} esp.</div>
-        <div class="levels">
-          <div><span class="label">Stop</span><span class="num down">${px(s.stop)}</span></div>
-          <div><span class="label">Entrada</span><span class="num">${px(s.entrada)}</span></div>
-          <div><span class="label">Objetivo</span><span class="num up">${px(s.objetivo)}</span></div>
-        </div>
-        <div class="track" aria-label="Posición del precio entre stop y objetivo"><div class="rail"></div><div class="tick"></div><div class="now" style="left:${posicion(s, p)}%"></div></div>
-        <div class="sig-foot"><span>${abierta ? `Entrar solo antes de ${px(s.precio_limite)} · hasta ${hora(s.t_limite)}` : `Precio ${px(p)} · cierre por tiempo ${D.config.velas_max} h`}</span><span class="r ${cls(r)}">${R(r)}</span></div>
-      </button>`;
-    }).join("");
-    box.querySelectorAll(".sig").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par, true)));
-  }
-
-  // ---------- radar ----------
-  function mejorSetup(p) {
-    const peso = (e) => (e.aprobada ? 1 : 0) + e.cumplidas / e.total + (e.senal && e.aprobada ? 2 : 0);
-    return p.estrategias.slice().sort((a, b) => peso(b) - peso(a))[0];
-  }
-  function ordenRadar() {
-    const peso = (p) => { const e = mejorSetup(p); return (e.senal && e.aprobada ? 10 : 0) + (e.aprobada ? 2 : 0) + e.cumplidas / e.total; };
-    return D.pares.slice().sort((a, b) => peso(b) - peso(a) || b.volumen24 - a.volumen24);
-  }
-  function pintarRadar() {
-    $("radar").innerHTML = ordenRadar().map((p) => {
-      const e = mejorSetup(p), lista = e.senal && e.aprobada;
-      const pips = Array.from({ length: e.total }, (_, i) => `<i class="${i < e.cumplidas ? "on" : ""}"></i>`).join("");
-      const precio = precioDe(p.par);
-      return `<button class="row" type="button" data-par="${esc(p.par)}" aria-current="${p.par === sel}">
-        <span class="sym"><b>${esc(base(p.par))}<small>/USDT</small></b><span class="trend ${p.tendencia}">${p.tendencia === "alcista" ? "▲" : p.tendencia === "bajista" ? "▼" : "◆"} ${p.tendencia}</span></span>
-        <span class="px"><span class="num">${px(precio)}</span><small class="${cls(p.cambio24)}">${pc(p.cambio24)}</small></span>
-        <span class="setup"><span class="name">${e.lado === 1 ? "▲" : "▼"} ${esc(e.nombre)}</span><span class="pips ${e.aprobada ? "go" : ""}">${pips}${lista ? '<span class="ok">SEÑAL</span>' : e.aprobada ? "" : '<span class="ok" style="color:var(--faint)">sin ventaja</span>'}</span></span>
-      </button>`;
-    }).join("");
-    $("radar").querySelectorAll(".row").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par, window.innerWidth < 1100)));
-  }
-
-  // ---------- detalle ----------
-  function elegir(par, desplazar) {
-    sel = par;
-    $("radar").querySelectorAll(".row").forEach((b) => b.setAttribute("aria-current", b.dataset.par === par));
-    pintarDetalle();
-    if (desplazar) $("h-det").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  }
-  function pintarDetalle() {
-    const p = D.pares.find((x) => x.par === sel);
-    if (!p) return;
-    $("det-note").textContent = `Última vela cerrada ${fecha(new Date(p.ultima_vela * 1000 + 3600000).toISOString())}`;
-    $("d-head").innerHTML = `
-      <div class="title"><b>${esc(base(p.par))}<span class="muted" style="font-size:.5em;font-weight:500"> /USDT perpetuo</span></b><span class="num">${px(precioDe(p.par))} <span class="${cls(p.cambio24)}">${pc(p.cambio24, 2)}</span></span></div>
-      <div class="stat"><span class="label">Tendencia 4h</span><span class="trend ${p.tendencia}" style="font-size:14px">${p.tendencia}</span></div>
+  // ---------- cabecera del gráfico ----------
+  function pintarCabecera(p) {
+    $("c-head").innerHTML = `
+      <div class="c-title"><b>${esc(base(p.par))}<small>/USDT perpetuo · MEXC</small></b><span class="num">${px(precioDe(p.par))} <span class="${cls(p.cambio24)}">${pc(p.cambio24, 2)}</span></span></div>
+      <div class="stat"><span class="label">Tendencia 4h</span><span class="trend ${p.tendencia}" style="font-size:13.5px">${p.tendencia}</span></div>
       <div class="stat"><span class="label">RSI 1h</span><span class="num">${p.rsi.toFixed(1)}</span></div>
       <div class="stat"><span class="label">ADX</span><span class="num">${p.adx.toFixed(1)}</span></div>
       <div class="stat"><span class="label">ATR 1h</span><span class="num">${(p.atr_pct * 100).toFixed(2)}%</span></div>
-      <div class="stat"><span class="label">Funding</span><span class="num ${cls(-p.funding)}">${(p.funding * 100).toFixed(4)}%</span></div>
+      <div class="stat"><span class="label">Funding</span><span class="num">${(p.funding * 100).toFixed(4)}%</span></div>
       <div class="stat"><span class="label">Vol. 24h</span><span class="num">$${vol(p.volumen24)}</span></div>`;
-    $("strats").innerHTML = p.estrategias.map((e) => {
-      const t = e.total_stats, o = e.oos_stats;
-      const estado = e.senal && e.aprobada ? '<span class="chip accent">Señal ahora</span>'
-        : e.aprobada ? '<span class="chip accent">Con ventaja</span>' : '<span class="chip neutral">Sin ventaja</span>';
-      return `<div class="strat">
-        <div class="strat-top"><b>${esc(e.nombre)}</b>${estado}</div>
-        <div class="muted" style="font-size:12.5px">${e.lado === 1 ? "Buscando LONG" : "Buscando SHORT"} · ${e.cumplidas} de ${e.total} condiciones</div>
-        <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul>
-        <div class="mini">
-          <div><span class="label">Ops</span><span class="num">${t.n}</span></div>
-          <div><span class="label">Acierto</span><span class="num">${Math.round(t.acierto * 100)}%</span></div>
-          <div><span class="label">Esperanza</span><span class="num ${cls(t.exp_r)}">${R(t.exp_r)}</span></div>
-          <div><span class="label">Reciente</span><span class="num ${cls(o.exp_r)}">${R(o.exp_r)}</span></div>
+  }
+
+  // ---------- operación posible ----------
+  function planActivo(p) {
+    const act = D.activas.find((s) => s.par === p.par);
+    if (act) return { activa: act, lado: act.lado, entrada: act.entrada, stop: act.stop, objetivo: act.objetivo, nombre: act.nombre };
+    const e = estrategia(p);
+    return { e, lado: e.lado, entrada: e.plan.entrada, stop: e.plan.stop, objetivo: e.plan.objetivo, nombre: e.nombre };
+  }
+  function pintarPlan(p) {
+    const pl = planActivo(p), e = pl.e || p.estrategias.find((x) => x.nombre === pl.nombre) || mejor(p);
+    const c = D.config, precio = precioDe(p.par);
+    const riesgo = Math.abs(pl.entrada - pl.stop), ganancia = Math.abs(pl.objetivo - pl.entrada);
+    const costo = (c.comision + c.deslizamiento) * 2 * pl.entrada;
+    const cant = c.riesgo_usd / (riesgo + costo), nocional = cant * pl.entrada;
+    let titulo, texto, color;
+    if (pl.activa) { titulo = "Señal activa"; texto = `Abierta ${hace(pl.activa.creada)} · ${(pl.activa.real || {}).estado === "abierta" ? "operando en real" : "seguimiento en papel"}.`; color = "var(--up)"; }
+    else if (e.senal && e.aprobada) { titulo = "Lista para operar"; texto = "Se cumplen todas las condiciones y la estrategia tiene ventaja comprobada."; color = "var(--up)"; }
+    else if (e.aprobada) { titulo = `En formación · faltan ${e.total - e.cumplidas}`; texto = "Estrategia con ventaja comprobada. Avisará cuando se cumplan todas las condiciones."; color = "var(--accent)"; }
+    else { titulo = "Solo referencia"; texto = "Esta estrategia no tiene ventaja estadística en este par: el bot no la opera."; color = "var(--faint)"; }
+    const pctS = riesgo / pl.entrada, pctT = ganancia / pl.entrada;
+    $("plan").innerHTML = `
+      <div><div class="label" style="margin-bottom:8px">Estrategia</div><div class="stabs">${p.estrategias.map((x) => `<button class="stab" type="button" data-k="${x.clave}" aria-pressed="${x.clave === e.clave && !pl.activa}"><span>${esc(x.nombre)}</span>${segs(x)}</button>`).join("")}</div></div>
+      <div class="verdict">${ring(pl.activa ? e.total : e.cumplidas, e.total, color)}<div><b>${titulo}</b><p>${texto}</p></div></div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">${ladoChip(pl.lado)}<span class="muted" style="font-size:12px">${esc(pl.nombre)}</span></div>
+        <div class="ladder">
+          <span class="tick" style="background:var(--up)"></span><span class="label">Objetivo</span><span class="num lv up">${px(pl.objetivo)}</span>
+          <span class="tick" style="background:var(--accent)"></span><span class="label">${pl.activa ? "Entrada" : "Entrada (precio actual)"}</span><span class="num lv">${px(pl.entrada)}</span>
+          <span class="tick" style="background:var(--down)"></span><span class="label">Stop</span><span class="num lv down">${px(pl.stop)}</span>
         </div>
-        ${e.aprobada ? `<div class="why">t = ${t.t.toFixed(1)} · factor de beneficio ${t.fb == null ? "∞" : t.fb.toFixed(2)} · caída máx. ${t.dd_r.toFixed(1)}R</div>` : `<div class="why">${esc(e.motivos.join(" · "))}</div>`}
-      </div>`;
-    }).join("");
-    pintarGrafico(p);
+        <div class="rr" title="Riesgo frente a beneficio"><i style="flex:${pctS / (pctS + pctT)}"></i><i style="flex:${pctT / (pctS + pctT)}"></i></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span class="down num">−${(pctS * 100).toFixed(2)}%</span><span class="muted">riesgo 1 : ${(ganancia / riesgo).toFixed(1)} beneficio</span><span class="up num">+${(pctT * 100).toFixed(2)}%</span></div>
+      </div>
+      <div class="kv">
+        <div><span class="label">Tamaño para $${c.riesgo_usd}</span><span class="num">${cant.toPrecision(4)} ${esc(base(p.par))}</span></div>
+        <div><span class="label">Margen a ${c.apalancamiento}x</span><span class="num">$${(nocional / c.apalancamiento).toFixed(2)}</span></div>
+        <div><span class="label">Si toca objetivo</span><span class="num up">${usd(c.riesgo_usd * (ganancia - costo) / riesgo)}</span></div>
+        <div><span class="label">Si toca stop</span><span class="num down">${usd(-c.riesgo_usd)}</span></div>
+      </div>
+      <div><div class="label">Condiciones ${e.cumplidas}/${e.total} · ${e.lado === 1 ? "para LONG" : "para SHORT"}</div>
+        <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
+      <div><div class="label" style="margin-bottom:8px">Historial de esta estrategia en ${esc(base(p.par))} (${c.dias} días)</div>
+        <div class="kv">
+          <div><span class="label">Operaciones</span><span class="num">${e.total_stats.n}</span></div>
+          <div><span class="label">Acierto</span><span class="num">${Math.round(e.total_stats.acierto * 100)}%</span></div>
+          <div><span class="label">Esperanza</span><span class="num ${cls(e.total_stats.exp_r)}">${R(e.total_stats.exp_r)}</span></div>
+          <div><span class="label">Meses recientes</span><span class="num ${cls(e.oos_stats.exp_r)}">${R(e.oos_stats.exp_r)}</span></div>
+        </div>
+        <div class="why">${e.aprobada ? `Aprobada · t = ${e.total_stats.t.toFixed(1)} · caída máxima ${e.total_stats.dd_r.toFixed(1)}R` : "No pasa el filtro: " + esc(e.motivos.join(" · "))}</div></div>`;
+    $("plan").querySelectorAll(".stab").forEach((b) => b.addEventListener("click", () => { estSel[p.par] = b.dataset.k; pintarEscena(); }));
   }
 
   // ---------- gráficos ----------
-  function opcionesTema() {
-    return {
-      layout: { background: { type: "solid", color: css("--surface") }, textColor: css("--muted"), fontFamily: "IBM Plex Mono, ui-monospace, monospace", fontSize: 11 },
-      grid: { vertLines: { color: css("--surface-2") }, horzLines: { color: css("--surface-2") } },
-      rightPriceScale: { borderColor: css("--line") },
-      timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
-      crosshair: { horzLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") }, vertLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") } },
-    };
-  }
+  const tema = () => ({
+    layout: { background: { type: "solid", color: css("--surface") }, textColor: css("--muted"), fontFamily: "IBM Plex Mono, ui-monospace, monospace", fontSize: 11 },
+    grid: { vertLines: { color: css("--surface-2") }, horzLines: { color: css("--surface-2") } },
+    rightPriceScale: { borderColor: css("--line") },
+    timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
+    crosshair: { horzLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") }, vertLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") } },
+  });
   const fmtT = (t) => new Intl.DateTimeFormat("es-EC", { timeZone: zona, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t * 1000));
-  const tick = (t, tipo) => new Intl.DateTimeFormat("es-EC", tipo <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t * 1000));
-
-  function crearGraficos() {
-    if (!window.LightweightCharts) return false;
+  const tick = (t, k) => new Intl.DateTimeFormat("es-EC", k <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t * 1000));
+  function crear() {
     if (chart) return true;
+    if (!window.LightweightCharts) return false;
     const LC = window.LightweightCharts;
-    chart = LC.createChart($("chart"), Object.assign(opcionesTema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
-    chart.timeScale().applyOptions({ tickMarkFormatter: tick, rightOffset: 4 });
-    sCandle = chart.addCandlestickSeries({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down"), borderVisible: false });
-    sE20 = chart.addLineSeries({ color: css("--accent"), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-    sE50 = chart.addLineSeries({ color: css("--ema50"), lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-    eqChart = LC.createChart($("equity"), Object.assign(opcionesTema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC", priceFormatter: (v) => v.toFixed(1) + "R" }, handleScroll: false, handleScale: false }));
+    chart = LC.createChart($("chart"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
+    chart.timeScale().applyOptions({ tickMarkFormatter: tick, rightOffset: 2 });
+    sVol = chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
+    chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.86, bottom: 0 } });
+    sTP = chart.addBaselineSeries({ lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    sSL = chart.addBaselineSeries({ lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    sC = chart.addCandlestickSeries({ borderVisible: false });
+    sE20 = chart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    sE50 = chart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    rsiChart = LC.createChart($("rsi"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
+    rsiChart.timeScale().applyOptions({ visible: false, rightOffset: 2 });
+    sRsi = rsiChart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false });
+    sRsi.createPriceLine({ price: 70, color: css("--faint"), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    sRsi.createPriceLine({ price: 30, color: css("--faint"), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    const enlazar = (a, b) => a.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (sync || !r) return; sync = true; b.timeScale().setVisibleLogicalRange(r); sync = false; });
+    enlazar(chart, rsiChart); enlazar(rsiChart, chart);
+    eqChart = LC.createChart($("equity"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC", priceFormatter: (v) => v.toFixed(1) + "R" }, handleScroll: false, handleScale: false }));
     eqChart.timeScale().applyOptions({ tickMarkFormatter: tick });
-    eqSeries = eqChart.addBaselineSeries({ baseValue: { type: "price", price: 0 }, lineWidth: 2, priceLineVisible: false });
+    eqS = eqChart.addBaselineSeries({ baseValue: { type: "price", price: 0 }, lineWidth: 2, priceLineVisible: false });
+    colorear();
     return true;
   }
-  function recolorear() {
+  function colorear() {
     if (!chart) return;
-    chart.applyOptions(opcionesTema()); eqChart.applyOptions(opcionesTema());
-    sCandle.applyOptions({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down") });
+    [chart, rsiChart, eqChart].forEach((c) => c.applyOptions(tema()));
+    sC.applyOptions({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down") });
     sE20.applyOptions({ color: css("--accent") }); sE50.applyOptions({ color: css("--ema50") });
-    pintarCurva();
-    if (sel) pintarGrafico(D.pares.find((x) => x.par === sel));
+    sRsi.applyOptions({ color: css("--accent") });
+    // la zona se pinta igual hacia arriba o hacia abajo, así sirve para long y short
+    const zona = (c, f) => ({ topFillColor1: f, topFillColor2: f, topLineColor: c, bottomFillColor1: f, bottomFillColor2: f, bottomLineColor: c });
+    sTP.applyOptions(zona(css("--up"), css("--up-soft"))); sSL.applyOptions(zona(css("--down"), css("--down-soft")));
+    eqS.applyOptions({ topLineColor: css("--up"), topFillColor1: css("--up-soft"), topFillColor2: "rgba(0,0,0,0)", bottomLineColor: css("--down"), bottomFillColor1: "rgba(0,0,0,0)", bottomFillColor2: css("--down-soft") });
+  }
+  function ema(vals, n) { const k = 2 / (n + 1); let e = null, out = []; vals.forEach((v, i) => { e = e == null ? v : v * k + e * (1 - k); out.push(i >= n - 1 ? e : null); }); return out; }
+  function rsi(vals, n = 14) { let g = 0, l = 0, out = [null]; for (let i = 1; i < vals.length; i++) { const d = vals[i] - vals[i - 1]; const up = Math.max(d, 0), dn = Math.max(-d, 0); if (i <= n) { g += up / n; l += dn / n; out.push(i === n ? 100 - 100 / (1 + g / (l || 1e-12)) : null); } else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n; out.push(100 - 100 / (1 + g / (l || 1e-12))); } } return out; }
+  function serie(p) {
+    if (tf === 1) return { v: p.velas, e20: p.ema20, e50: p.ema50, rsi: p.rsi_serie, paso: 3600 };
+    const g = new Map();
+    p.velas.forEach(([t, o, h, l, c, vv]) => { const k = Math.floor(t / 14400) * 14400; const x = g.get(k); if (!x) g.set(k, [k, o, h, l, c, vv]); else { x[2] = Math.max(x[2], h); x[3] = Math.min(x[3], l); x[4] = c; x[5] += vv; } });
+    const v = [...g.values()], cl = v.map((x) => x[4]);
+    return { v, e20: ema(cl, 20), e50: ema(cl, 50), rsi: rsi(cl), paso: 14400 };
   }
   function pintarGrafico(p) {
-    if (!crearGraficos()) { $("chart-note").textContent = "No se pudo cargar la librería de gráficos. Revisa tu conexión."; return; }
-    const d = dec(p.precio);
-    sCandle.applyOptions({ priceFormat: { type: "price", precision: d, minMove: Math.pow(10, -d) } });
-    sCandle.setData(p.velas.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
-    const linea = (arr) => p.velas.map((v, i) => arr[i] == null ? { time: v[0] } : { time: v[0], value: arr[i] });
-    sE20.setData(linea(p.ema20)); sE50.setData(linea(p.ema50));
-    const nombres = { retroceso: "R", ruptura: "B", rebote_rsi: "S" };
-    const marcas = p.marcas.map((m) => ({ time: m.t, position: m.lado === 1 ? "belowBar" : "aboveBar", color: m.r > 0 ? css("--up") : css("--down"), shape: m.lado === 1 ? "arrowUp" : "arrowDown", text: nombres[m.clave] || "" }));
-    D.activas.filter((s) => s.par === p.par).forEach((s) => marcas.push({ time: Math.floor(new Date(s.t_entrada) / 1000) - 3600, position: s.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "ACTIVA" }));
-    const tiempos = new Set(p.velas.map((v) => v[0]));
-    sCandle.setMarkers(marcas.filter((m) => tiempos.has(m.time)).sort((a, b) => a.time - b.time));
-    priceLines.forEach((l) => sCandle.removePriceLine(l)); priceLines = [];
-    const act = D.activas.filter((s) => s.par === p.par);
-    act.forEach((s) => {
-      priceLines.push(sCandle.createPriceLine({ price: s.objetivo, color: css("--up"), lineWidth: 1, lineStyle: 2, title: "TP" }));
-      priceLines.push(sCandle.createPriceLine({ price: s.entrada, color: css("--accent"), lineWidth: 1, lineStyle: 0, title: "Entrada" }));
-      priceLines.push(sCandle.createPriceLine({ price: s.stop, color: css("--down"), lineWidth: 1, lineStyle: 2, title: "SL" }));
-    });
-    chart.timeScale().fitContent();
-    $("chart-note").textContent = act.length
-      ? "Líneas: entrada, stop y objetivo de la señal activa. Flechas: entradas que habría dado cada estrategia (verde ganó, rojo perdió). R = retroceso, B = ruptura, S = rebote RSI."
-      : "Flechas: entradas que habría dado cada estrategia en estos 7 días (verde ganó, rojo perdió). R = retroceso, B = ruptura, S = rebote RSI.";
-  }
-  function pintarCurva() {
-    if (!crearGraficos()) return;
-    const pts = new Map();
-    D.curva.forEach(([t, v]) => pts.set(t, v));
-    const data = [...pts].map(([time, value]) => ({ time, value }));
-    eqSeries.applyOptions({ topLineColor: css("--up"), topFillColor1: css("--up-soft"), topFillColor2: "rgba(0,0,0,0)", bottomLineColor: css("--down"), bottomFillColor1: "rgba(0,0,0,0)", bottomFillColor2: css("--down-soft") });
-    eqSeries.setData(data);
-    eqChart.timeScale().fitContent();
+    if (!crear()) { $("c-note").textContent = "No se pudo cargar la librería de gráficos. Revisa tu conexión."; return; }
+    const s = serie(p), d = dec(p.precio);
+    sC.applyOptions({ priceFormat: { type: "price", precision: d, minMove: Math.pow(10, -d) } });
+    sC.setData(s.v.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
+    const linea = (arr) => s.v.map((x, i) => arr[i] == null ? { time: x[0] } : { time: x[0], value: arr[i] });
+    sE20.setData(vis.ema ? linea(s.e20) : []); sE50.setData(vis.ema ? linea(s.e50) : []);
+    sVol.setData(vis.vol ? s.v.map(([time, o, , , c, v]) => ({ time, value: v, color: c >= o ? css("--up-soft") : css("--down-soft") })) : []);
+    sRsi.setData(linea(s.rsi));
+    // entradas históricas
+    const tiempos = new Set(s.v.map((x) => x[0])), letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S" };
+    const marcas = vis.hist ? p.marcas.map((m) => ({ time: Math.floor(m.t / s.paso) * s.paso, position: m.lado === 1 ? "belowBar" : "aboveBar", color: m.r > 0 ? css("--up") : css("--down"), shape: m.lado === 1 ? "arrowUp" : "arrowDown", text: letra[m.clave] || "" })).filter((m) => tiempos.has(m.time)) : [];
+    D.activas.filter((a) => a.par === p.par).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / s.paso) * s.paso; if (tiempos.has(t)) marcas.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "ACTIVA" }); });
+    sC.setMarkers(marcas.sort((a, b) => a.time - b.time));
+    // operación posible: zonas de ganancia y pérdida proyectadas a la derecha
+    lines.forEach((l) => sC.removePriceLine(l)); lines = [];
+    const pl = planActivo(p), ult = s.v[s.v.length - 1][0], n = tf === 1 ? 24 : 10;
+    if (vis.niveles) {
+      const fut = Array.from({ length: n + 1 }, (_, i) => ult + i * s.paso);
+      sTP.applyOptions({ baseValue: { type: "price", price: pl.entrada } }); sSL.applyOptions({ baseValue: { type: "price", price: pl.entrada } });
+      sTP.setData(fut.map((time) => ({ time, value: pl.objetivo }))); sSL.setData(fut.map((time) => ({ time, value: pl.stop })));
+      lines.push(sC.createPriceLine({ price: pl.objetivo, color: css("--up"), lineWidth: 1, lineStyle: 2, title: "Objetivo" }));
+      lines.push(sC.createPriceLine({ price: pl.entrada, color: css("--accent"), lineWidth: 1, lineStyle: 0, title: pl.activa ? "Entrada" : "Entrada posible" }));
+      lines.push(sC.createPriceLine({ price: pl.stop, color: css("--down"), lineWidth: 1, lineStyle: 2, title: "Stop" }));
+    } else { sTP.setData([]); sSL.setData([]); }
+    // vista inicial: las últimas velas y espacio a la derecha para la proyección
+    const ver = tf === 1 ? 110 : 60, total = s.v.length;
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - ver), to: total + (vis.niveles ? n : 2) });
+    $("legend").innerHTML = `${vis.ema ? '<span><i style="background:var(--accent)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span>' : ""}${vis.niveles ? '<span><i class="z" style="background:var(--up-soft);border:1px solid var(--up)"></i>zona de ganancia</span><span><i class="z" style="background:var(--down-soft);border:1px solid var(--down)"></i>zona de pérdida</span>' : ""}`;
+    $("c-note").innerHTML = (pl.activa ? "Zonas de la <b>señal activa</b>." : `Zonas de la operación posible de <b>${esc(pl.nombre)}</b> si se entrara ahora.`) + (vis.hist ? " Flechas: entradas que habría dado cada estrategia (verde ganó, rojo perdió; R retroceso, B ruptura, S rebote RSI)." : "");
   }
 
-  // ---------- bot ----------
+  // ---------- matriz ----------
+  function pintarMatriz() {
+    const claves = D.pares[0] ? D.pares[0].estrategias.map((e) => [e.clave, e.nombre]) : [];
+    $("mx").innerHTML = `<thead><tr><th>Par</th>${claves.map(([, n]) => `<th>${esc(n)}</th>`).join("")}</tr></thead><tbody>${D.pares.map((p) => `<tr>
+      <td class="pair"><b>${esc(base(p.par))}</b><br><span class="trend ${p.tendencia}">${p.tendencia}</span></td>
+      ${p.estrategias.map((e) => `<td><button class="cell ${p.par === sel && estrategia(p).clave === e.clave ? "sel" : ""}" type="button" data-par="${esc(p.par)}" data-k="${e.clave}">
+        <span class="top2"><span>${e.lado === 1 ? "▲ long" : "▼ short"} · ${e.cumplidas}/${e.total}</span><span style="color:${e.senal && e.aprobada ? "var(--up)" : e.aprobada ? "var(--accent)" : "var(--faint)"}">${e.senal && e.aprobada ? "SEÑAL" : e.aprobada ? "con ventaja" : "sin ventaja"}</span></span>${segs(e)}</button></td>`).join("")}</tr>`).join("")}</tbody>`;
+    $("mx").querySelectorAll(".cell").forEach((b) => b.addEventListener("click", () => { estSel[b.dataset.par] = b.dataset.k; elegir(b.dataset.par, true); }));
+  }
+
+  // ---------- indicadores, bot y señales ----------
+  function pintarKpis() {
+    const rd = D.rendimiento, ap = D.backtest.filter((b) => b.aprobada).length, t = { alcista: 0, bajista: 0, lateral: 0 };
+    D.pares.forEach((p) => t[p.tendencia]++); const n = D.pares.length || 1;
+    $("kpis").innerHTML = `
+      <div class="kpi"><span class="label">Señales activas</span><span class="v">${D.activas.length}</span><span class="s">${D.activas.length ? "seguimiento cada " + D.intervalo_min + " min" : "esperando un setup con ventaja"}</span></div>
+      <div class="kpi"><span class="label">Resultado de las señales</span><span class="v ${cls(rd.total_r)}">${rd.n ? R(rd.total_r) : "–"}</span><span class="s">${rd.n ? `${rd.n} cerradas · ${Math.round(rd.acierto * 100)}% acierto` : "aún sin señales cerradas"}</span></div>
+      <div class="kpi"><span class="label">Estrategias con ventaja</span><span class="v">${ap}<span class="muted" style="font-size:.6em"> / ${D.backtest.length}</span></span><span class="s">pasan el filtro estadístico hoy</span></div>
+      <div class="kpi"><span class="label">Tendencia 4h</span><span class="v" style="font-size:16px;line-height:1.5"><span class="up">${t.alcista} ▲</span> <span class="muted">·</span> <span class="down">${t.bajista} ▼</span> <span class="muted">·</span> <span class="muted">${t.lateral} ◆</span></span>
+        <div class="gauge" style="display:flex"><i style="width:${t.alcista / n * 100}%;background:var(--up)"></i><i style="width:${t.lateral / n * 100}%;background:var(--faint)"></i><i style="width:${t.bajista / n * 100}%;background:var(--down)"></i></div></div>`;
+  }
   function pintarBot() {
     const b = D.bot || {}, r = b.real || {}, pg = b.progreso || {};
     if (!b.modo) { $("bot").innerHTML = '<div class="empty">Sin datos del bot todavía.</div>'; return; }
-    const etiqueta = { real: ["REAL", "accent"], simulado: ["PAPEL", "neutral"], apagado: ["APAGADO", "neutral"] }[b.modo];
-    const avance = Math.min(1, (pg.cerradas || 0) / (pg.necesarias || 30));
-    const uso = (v, lim) => Math.min(1, Math.max(0, -v) / lim);
-    $("bot-note").textContent = b.configurado === "auto" ? "Modo automático: pasa a real solo con evidencia" : "Modo fijado en la configuración: " + b.configurado;
+    const et = { real: ["REAL", "accent", "operando con dinero real"], simulado: ["PAPEL", "neutral", "sin dinero real"], apagado: ["APAGADO", "neutral", "sin operar"] }[b.modo];
+    const uso = (v, lim) => Math.min(1, Math.max(0, -(v || 0)) / lim);
+    $("bot-note").textContent = b.configurado === "auto" ? "Pasa a real solo con evidencia" : "Modo fijado: " + b.configurado;
     $("bot").innerHTML = `
-      <div><div class="bot-modo"><b>${etiqueta[0]}</b><span class="chip ${etiqueta[1]}">${b.modo === "real" ? "operando con dinero real" : b.modo === "simulado" ? "sin dinero real" : "sin operar"}</span></div>
-        <p>${esc(b.motivo)}</p>
-        ${b.modo !== "real" && b.configurado === "auto" ? `<div class="gauge"><i style="width:${avance * 100}%"></i></div><span class="s">${pg.cerradas || 0} de ${pg.necesarias} señales cerradas · esperanza en papel ${R(pg.exp_r)}</span>` : ""}</div>
-      <div><span class="label">Hoy (real)</span><span class="v ${cls(r.hoy)}">${(r.hoy >= 0 ? "+" : "") + "$" + Math.abs(r.hoy || 0).toFixed(2)}</span>
-        <div class="gauge loss"><i style="width:${uso(r.hoy, r.limite_dia) * 100}%"></i></div><span class="s">freno a −$${r.limite_dia} en el día</span></div>
-      <div><span class="label">Este mes (real)</span><span class="v ${cls(r.mes)}">${(r.mes >= 0 ? "+" : "") + "$" + Math.abs(r.mes || 0).toFixed(2)}</span>
-        <div class="gauge loss"><i style="width:${uso(r.mes, r.limite_mes) * 100}%"></i></div><span class="s">freno a −$${r.limite_mes} en el mes</span></div>
-      <div><span class="label">Posiciones reales</span><span class="v">${r.abiertas} <span class="muted" style="font-size:.7em">/ ${r.max_posiciones}</span></span>
-        <span class="s">$${r.riesgo_usd} de riesgo por operación · ${r.apalancamiento}x aislado · total ${r.cerradas ? (r.total >= 0 ? "+" : "−") + "$" + Math.abs(r.total).toFixed(2) : "sin cierres"}</span></div>`;
+      <div><div class="bot-modo"><b>${et[0]}</b><span class="chip ${et[1]}">${et[2]}</span></div><p>${esc(b.motivo)}</p>
+        ${b.modo !== "real" && b.configurado === "auto" ? `<div class="gauge"><i style="width:${Math.min(1, (pg.cerradas || 0) / (pg.necesarias || 30)) * 100}%"></i></div><span class="s">${pg.cerradas || 0} de ${pg.necesarias} señales cerradas · esperanza en papel ${R(pg.exp_r)}</span>` : ""}</div>
+      <div><span class="label">Hoy (real)</span><span class="v ${cls(r.hoy)}">${usd(r.hoy)}</span><div class="gauge loss"><i style="width:${uso(r.hoy, r.limite_dia) * 100}%"></i></div><span class="s">freno a −$${r.limite_dia} en el día</span></div>
+      <div><span class="label">Este mes (real)</span><span class="v ${cls(r.mes)}">${usd(r.mes)}</span><div class="gauge loss"><i style="width:${uso(r.mes, r.limite_mes) * 100}%"></i></div><span class="s">freno a −$${r.limite_mes} en el mes</span></div>
+      <div><span class="label">Posiciones reales</span><span class="v">${r.abiertas} <span class="muted" style="font-size:.7em">/ ${r.max_posiciones}</span></span><span class="s">$${r.riesgo_usd} de riesgo por operación · ${r.apalancamiento}x aislado</span></div>`;
   }
-  function pintarReales() {
-    const rs = D.reales || [];
-    if (!rs.length) {
-      $("p-real").innerHTML = `<div class="empty"><b>Aún no hay operaciones con dinero real.</b><span>${esc((D.bot || {}).motivo || "")} Aquí aparecerá cada orden enviada a MEXC, las que el bot decidió no abrir y por qué.</span></div>`;
-      return;
-    }
-    const est = { abierta: ["Abierta", "accent"], cerrada: ["Cerrada", "neutral"], omitida: ["No abierta", "neutral"], error: ["Error", "short"] };
-    $("p-real").innerHTML = `<div class="scroll-x"><table><thead><tr><th>Fecha</th><th>Par</th><th>Lado</th><th>Estado</th><th class="r">Contratos</th><th class="r">Entrada</th><th class="r">Resultado</th><th>Detalle</th></tr></thead>
-      <tbody>${rs.map((x) => `<tr><td class="num">${fecha(x.t_cierre || x.t)}</td><td><b>${esc(base(x.par))}</b></td><td>${lado(x.lado)}</td>
-        <td><span class="chip ${est[x.estado][1]}">${est[x.estado][0]}</span></td><td class="num r">${x.vol ?? "–"}</td><td class="num r">${x.precio_entrada ? px(x.precio_entrada) : "–"}</td>
-        <td class="num r ${cls(x.pnl)}">${x.pnl != null ? (x.pnl >= 0 ? "+" : "−") + "$" + Math.abs(x.pnl).toFixed(2) + (x.estimado ? "*" : "") : "–"}</td>
-        <td class="muted" style="white-space:normal;min-width:200px">${esc(x.motivo || (x.estado === "abierta" ? `Margen $${x.margen} · stop ${px(x.stop)} · objetivo ${px(x.objetivo)}` : ""))}</td></tr>`).join("")}</tbody></table></div>
-      <p class="muted" style="margin:0;font-size:12px">Resultados según MEXC (incluye funding). * = estimado con el seguimiento en papel porque MEXC no devolvió el dato.</p>`;
+  function rAct(s, p) { const c = D.config; return (s.lado * (p - s.entrada) - (c.comision + c.deslizamiento) * (s.entrada + p)) / s.riesgo; }
+  function pos(s, p) { const g = Math.abs(s.objetivo - s.stop); return Math.max(0, Math.min(1, s.lado === 1 ? (p - s.stop) / g : (s.stop - p) / g)) * 100; }
+  function pintarActivas() {
+    $("act-note").textContent = D.activas.length ? "Toca una para verla en el gráfico" : "";
+    if (!D.activas.length) { $("activas").innerHTML = `<div class="panel empty" style="grid-column:1/-1"><b>No hay señales abiertas.</b><span>Cuando una estrategia con ventaja se active, aparecerá aquí con su seguimiento y te llegará el aviso por Telegram.</span></div>`; return; }
+    $("activas").innerHTML = D.activas.map((s) => { const p = precioDe(s.par), r = rAct(s, p); return `<button class="sig ${s.lado === 1 ? "" : "short"}" data-par="${esc(s.par)}" type="button">
+      <div class="sig-top"><span class="pair">${esc(base(s.par))}</span>${ladoChip(s.lado)}${(s.real || {}).estado === "abierta" ? '<span class="chip accent">REAL</span>' : '<span class="chip neutral">PAPEL</span>'}<span class="when">${hace(s.creada)}</span></div>
+      <div class="sig-strat">${esc(s.nombre)} · ${s.stats.n} ops, ${Math.round(s.stats.acierto * 100)}% acierto</div>
+      <div class="levels"><div><span class="label">Stop</span><span class="num down">${px(s.stop)}</span></div><div><span class="label">Entrada</span><span class="num">${px(s.entrada)}</span></div><div><span class="label">Objetivo</span><span class="num up">${px(s.objetivo)}</span></div></div>
+      <div class="track"><div class="rail"></div><div class="tk"></div><div class="now" style="left:${pos(s, p)}%"></div></div>
+      <div class="sig-foot"><span>Precio ${px(p)}</span><span class="r ${cls(r)}">${R(r)}</span></div></button>`; }).join("");
+    $("activas").querySelectorAll(".sig").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par, true)));
   }
 
   // ---------- pestañas ----------
   function pintarHistorial() {
     const h = D.historial, rd = D.rendimiento;
-    if (!h.length) {
-      $("p-hist").innerHTML = `<div class="empty"><b>Todavía no hay señales cerradas.</b><span>Cada señal enviada se sigue hasta que toca el objetivo, el stop o cumple ${D.config.velas_max} h. Aquí verás el resultado real, para compararlo con el backtest.</span></div>`;
-      return;
-    }
-    const txt = { objetivo: ["Objetivo", "long"], stop: ["Stop", "short"], tiempo: ["Tiempo", "neutral"] };
-    $("p-hist").innerHTML = `
-      <div class="sum-row">
-        <div class="stat"><span class="label">Cerradas</span><span class="num">${rd.n}</span></div>
-        <div class="stat"><span class="label">Acierto</span><span class="num">${Math.round(rd.acierto * 100)}%</span></div>
-        <div class="stat"><span class="label">Esperanza</span><span class="num ${cls(rd.exp_r)}">${R(rd.exp_r)}</span></div>
-        <div class="stat"><span class="label">Total</span><span class="num ${cls(rd.total_r)}">${R(rd.total_r)} · $${(rd.total_r * D.config.riesgo_usd).toFixed(2)}</span></div>
-      </div>
-      <div class="scroll-x"><table>
-        <thead><tr><th>Cierre</th><th>Par</th><th>Lado</th><th>Estrategia</th><th class="r">Entrada</th><th class="r">Salida</th><th>Resultado</th><th class="r">R</th></tr></thead>
-        <tbody>${h.map((s) => `<tr>
-          <td class="num">${fecha(s.t_cierre)}</td><td><b>${esc(base(s.par))}</b></td><td>${lado(s.lado)}</td><td>${esc(s.nombre)}</td>
-          <td class="num r">${px(s.entrada)}</td><td class="num r">${px(s.salida)}</td>
-          <td><span class="chip ${txt[s.estado][1]}">${txt[s.estado][0]}</span></td><td class="num r ${cls(s.r)}"><b>${R(s.r)}</b></td></tr>`).join("")}</tbody>
-      </table></div>`;
+    if (!h.length) { $("p-hist").innerHTML = `<div class="empty"><b>Todavía no hay señales cerradas.</b><span>Cada señal se sigue hasta que toca el objetivo, el stop o cumple ${D.config.velas_max} h, para comparar el resultado real con el backtest.</span></div>`; return; }
+    const tx = { objetivo: ["Objetivo", "long"], stop: ["Stop", "short"], tiempo: ["Tiempo", "neutral"] };
+    $("p-hist").innerHTML = `<div class="sum-row"><div class="stat"><span class="label">Cerradas</span><span class="num">${rd.n}</span></div><div class="stat"><span class="label">Acierto</span><span class="num">${Math.round(rd.acierto * 100)}%</span></div><div class="stat"><span class="label">Esperanza</span><span class="num ${cls(rd.exp_r)}">${R(rd.exp_r)}</span></div><div class="stat"><span class="label">Total</span><span class="num ${cls(rd.total_r)}">${R(rd.total_r)}</span></div></div>
+      <div class="scroll-x"><table class="t"><thead><tr><th>Cierre</th><th>Par</th><th>Lado</th><th>Estrategia</th><th class="r">Entrada</th><th class="r">Salida</th><th>Resultado</th><th class="r">R</th></tr></thead><tbody>${h.map((s) => `<tr><td class="num">${fecha(s.t_cierre)}</td><td><b>${esc(base(s.par))}</b></td><td>${ladoChip(s.lado)}</td><td>${esc(s.nombre)}</td><td class="num r">${px(s.entrada)}</td><td class="num r">${px(s.salida)}</td><td><span class="chip ${tx[s.estado][1]}">${tx[s.estado][0]}</span></td><td class="num r ${cls(s.r)}"><b>${R(s.r)}</b></td></tr>`).join("")}</tbody></table></div>`;
+  }
+  function pintarReales() {
+    const rs = D.reales || [];
+    if (!rs.length) { $("p-real").innerHTML = `<div class="empty"><b>Aún no hay operaciones con dinero real.</b><span>${esc((D.bot || {}).motivo || "")} Aquí aparecerá cada orden enviada a MEXC y las que el bot decidió no abrir, con el motivo.</span></div>`; return; }
+    const est = { abierta: ["Abierta", "accent"], cerrada: ["Cerrada", "neutral"], omitida: ["No abierta", "neutral"], error: ["Error", "short"] };
+    $("p-real").innerHTML = `<div class="scroll-x"><table class="t"><thead><tr><th>Fecha</th><th>Par</th><th>Lado</th><th>Estado</th><th class="r">Contratos</th><th class="r">Entrada</th><th class="r">Resultado</th><th>Detalle</th></tr></thead><tbody>${rs.map((x) => `<tr><td class="num">${fecha(x.t_cierre || x.t)}</td><td><b>${esc(base(x.par))}</b></td><td>${ladoChip(x.lado)}</td><td><span class="chip ${est[x.estado][1]}">${est[x.estado][0]}</span></td><td class="num r">${x.vol ?? "–"}</td><td class="num r">${x.precio_entrada ? px(x.precio_entrada) : "–"}</td><td class="num r ${cls(x.pnl)}">${x.pnl != null ? usd(x.pnl) + (x.estimado ? "*" : "") : "–"}</td><td class="muted" style="white-space:normal;min-width:200px">${esc(x.motivo || (x.estado === "abierta" ? `Margen $${x.margen} · stop ${px(x.stop)} · objetivo ${px(x.objetivo)}` : ""))}</td></tr>`).join("")}</tbody></table></div><p class="muted" style="margin:0;font-size:12px">Resultados según MEXC (incluye funding). * = estimado con el seguimiento en papel.</p>`;
   }
   let orden = "exp";
   function pintarBacktest() {
-    const ap = D.backtest.filter((b) => b.aprobada);
-    const totR = D.curva.length ? D.curva[D.curva.length - 1][1] : 0;
-    $("bt-sum").innerHTML = `
-      <div class="stat"><span class="label">Historial</span><span class="num">${D.config.dias} días · 1h</span></div>
-      <div class="stat"><span class="label">Aprobadas</span><span class="num">${ap.length} de ${D.backtest.length}</span></div>
-      <div class="stat"><span class="label">Ops aprobadas</span><span class="num">${ap.reduce((a, b) => a + b.total.n, 0)}</span></div>
-      <div class="stat"><span class="label">Total aprobadas</span><span class="num ${cls(totR)}">${R(totR)}</span></div>`;
-    const filas = D.backtest.slice().sort((a, b) => orden === "exp" ? b.total.exp_r - a.total.exp_r : orden === "t" ? b.total.t - a.total.t : b.total.n - a.total.n);
+    const ap = D.backtest.filter((b) => b.aprobada), totR = D.curva.length ? D.curva[D.curva.length - 1][1] : 0;
+    $("bt-sum").innerHTML = `<div class="stat"><span class="label">Historial</span><span class="num">${D.config.dias} días · 1h</span></div><div class="stat"><span class="label">Aprobadas</span><span class="num">${ap.length} de ${D.backtest.length}</span></div><div class="stat"><span class="label">Comisión usada</span><span class="num">${(D.config.comision * 100).toFixed(2)}% + ${(D.config.deslizamiento * 100).toFixed(2)}%</span></div><div class="stat"><span class="label">Total aprobadas</span><span class="num ${cls(totR)}">${R(totR)}</span></div>`;
+    const f = D.backtest.slice().sort((a, b) => orden === "exp" ? b.total.exp_r - a.total.exp_r : orden === "t" ? b.total.t - a.total.t : b.total.n - a.total.n);
     const th = (k, t) => `<th class="r"><button class="btn" style="padding:2px 6px;font-size:11px" data-o="${k}" type="button">${t}${orden === k ? " ↓" : ""}</button></th>`;
-    $("bt-table").innerHTML = `<thead><tr><th>Par</th><th>Estrategia</th>${th("n", "Ops")}<th class="r">Acierto</th>${th("exp", "Esperanza")}<th class="r">FB</th>${th("t", "t")}<th class="r">Reciente</th><th>Estado</th></tr></thead>
-      <tbody>${filas.map((b) => `<tr><td><b>${esc(base(b.par))}</b></td><td>${esc(b.nombre)}</td><td class="num r">${b.total.n}</td><td class="num r">${Math.round(b.total.acierto * 100)}%</td>
-        <td class="num r ${cls(b.total.exp_r)}">${R(b.total.exp_r)}</td><td class="num r">${b.total.fb == null ? "∞" : b.total.fb.toFixed(2)}</td><td class="num r">${b.total.t.toFixed(1)}</td>
-        <td class="num r ${cls(b.oos.exp_r)}">${b.oos.n} · ${R(b.oos.exp_r)}</td>
-        <td>${b.aprobada ? '<span class="chip accent">Aprobada</span>' : `<span class="muted" style="white-space:normal;display:block;min-width:220px">${esc(b.motivos[0] || "")}</span>`}</td></tr>`).join("")}</tbody>`;
+    $("bt-table").innerHTML = `<thead><tr><th>Par</th><th>Estrategia</th>${th("n", "Ops")}<th class="r">Acierto</th>${th("exp", "Esperanza")}<th class="r">FB</th>${th("t", "t")}<th class="r">Reciente</th><th>Estado</th></tr></thead><tbody>${f.map((b) => `<tr><td><b>${esc(base(b.par))}</b></td><td>${esc(b.nombre)}</td><td class="num r">${b.total.n}</td><td class="num r">${Math.round(b.total.acierto * 100)}%</td><td class="num r ${cls(b.total.exp_r)}">${R(b.total.exp_r)}</td><td class="num r">${b.total.fb == null ? "∞" : b.total.fb.toFixed(2)}</td><td class="num r">${b.total.t.toFixed(1)}</td><td class="num r ${cls(b.oos.exp_r)}">${b.oos.n} · ${R(b.oos.exp_r)}</td><td>${b.aprobada ? '<span class="chip accent">Aprobada</span>' : `<span class="muted" style="white-space:normal;display:block;min-width:220px">${esc(b.motivos[0] || "")}</span>`}</td></tr>`).join("")}</tbody>`;
     $("bt-table").querySelectorAll("[data-o]").forEach((b) => b.addEventListener("click", () => { orden = b.dataset.o; pintarBacktest(); }));
-    pintarCurva();
+    if (crear()) { const m = new Map(); D.curva.forEach(([t, v]) => m.set(t, v)); eqS.setData([...m].map(([time, value]) => ({ time, value }))); eqChart.timeScale().fitContent(); }
   }
   function pintarConfig() {
     const c = D.config;
-    $("p-cfg").innerHTML = `<div class="foot" style="color:var(--fg);font-size:13.5px;gap:10px">
-      <p>Cada ${D.intervalo_min} minutos el sistema descarga de MEXC el último año de velas de 1 hora de los ${D.pares.length} perpetuos con más volumen, recalcula tres estrategias y las prueba con costos reales: comisión ${(c.comision * 100).toFixed(2)}% y deslizamiento ${(c.deslizamiento * 100).toFixed(2)}% por lado.</p>
-      <p>Stop a ${c.atr_stop} × ATR(14) y objetivo a ${c.ratio} veces esa distancia; si no toca ninguno en ${c.velas_max} h, se cierra. Una estrategia recibe la marca <b>Con ventaja</b> solo si gana en el primer 70% del año y también en el 30% más reciente, con estadístico t ≥ ${c.min_t}. Con precios aleatorios, apenas un 0.6% pasa ese filtro.</p>
-      <p>El bot arriesga $${c.riesgo_usd} por operación con ${c.apalancamiento}x y margen aislado. En modo automático opera en papel hasta tener 30 señales cerradas con resultado positivo, vuelve a papel si las últimas 20 pierden en promedio, y nunca abre una posición que pueda llevar la pérdida del día o del mes más allá de los frenos. Cambia esos valores en las variables del repositorio.</p>
-      <p class="muted">R es la unidad de riesgo: 1R es lo que pierdes si toca el stop. Una esperanza de +0.30R significa ganar en promedio 0.30 veces tu riesgo por operación a largo plazo.</p></div>`;
+    $("p-cfg").innerHTML = `<div class="foot" style="color:var(--fg);font-size:13.5px">
+      <p>Cada ${D.intervalo_min} minutos el sistema descarga de MEXC el último año de velas de 1 hora de las ${D.pares.length} criptomonedas con más volumen, recalcula tres estrategias y las prueba con costos reales: comisión ${(c.comision * 100).toFixed(2)}% y deslizamiento ${(c.deslizamiento * 100).toFixed(2)}% por lado.</p>
+      <p>La <b>operación posible</b> muestra dónde quedarían la entrada, el stop (${c.atr_stop} × ATR) y el objetivo (${c.ratio} veces el riesgo) si la estrategia se activara ahora. Es una referencia: solo se convierte en señal cuando se cumplen todas las condiciones <b>y</b> la estrategia pasa el filtro estadístico (gana en el primer 70% del año y en el 30% reciente, con t ≥ ${c.min_t}).</p>
+      <p>El bot arriesga $${c.riesgo_usd} por operación con ${c.apalancamiento}x aislado, opera en papel hasta tener 30 señales cerradas con resultado positivo y nunca abre una posición que pueda superar los frenos diario y mensual.</p>
+      <p class="muted">R es la unidad de riesgo: 1R es lo que pierdes si toca el stop.</p></div>`;
   }
   document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
     document.querySelectorAll(".tab").forEach((x) => { const on = x === t; x.setAttribute("aria-selected", on); $(x.getAttribute("aria-controls")).hidden = !on; });
-    if (t.id === "t-bt") { pintarCurva(); }
+    if (t.id === "t-bt") pintarBacktest();
   }));
+  document.querySelectorAll("[data-tf]").forEach((b) => b.addEventListener("click", () => { tf = +b.dataset.tf; document.querySelectorAll("[data-tf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pintarGrafico(par(sel)); }));
+  document.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => { const k = b.dataset.t; vis[k] = !vis[k]; b.setAttribute("aria-pressed", vis[k]); pintarGrafico(par(sel)); }));
 
-  // ---------- carga ----------
+  // ---------- flujo ----------
+  function pintarEscena() { const p = par(sel); if (!p) return; pintarCabecera(p); pintarPlan(p); pintarGrafico(p); pintarMatriz(); }
+  function elegir(p, subir) {
+    sel = p; $("strip").querySelectorAll(".pchip").forEach((b) => b.setAttribute("aria-pressed", b.dataset.par === p));
+    pintarEscena();
+    if (subir) document.querySelector(".stage").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  }
   function pintarTodo() {
-    zona = D.config.zona || zona;
-    $("demo").hidden = !D.demo;
-    if (!sel || !D.pares.some((p) => p.par === sel)) sel = (D.activas[0] || {}).par || (ordenRadar()[0] || {}).par;
-    pintarEstado(); pintarKpis(); pintarBot(); pintarActivas(); pintarReales(); pintarRadar(); pintarDetalle(); pintarHistorial(); pintarBacktest(); pintarConfig();
+    zona = D.config.zona || zona; $("demo").hidden = !D.demo;
+    if (!sel || !par(sel)) { const o = D.pares.slice().sort((a, b) => { const w = (p) => { const e = mejor(p); return (e.senal && e.aprobada ? 10 : 0) + (e.aprobada ? 2 : 0) + e.cumplidas / e.total; }; return w(b) - w(a); }); sel = (D.activas[0] || {}).par || (o[0] || {}).par; }
+    pintarEstado(); pintarStrip(); pintarEscena(); pintarKpis(); pintarBot(); pintarActivas(); pintarHistorial(); pintarReales(); pintarBacktest(); pintarConfig();
   }
   async function cargar() {
     try {
@@ -602,34 +596,23 @@ td.r, th.r { text-align: right; }
       const nuevo = await r.json();
       if (!D || nuevo.generado !== D.generado) { D = nuevo; pintarTodo(); } else pintarEstado();
     } catch (e) {
-      if (!D) {
-        $("status").innerHTML = '<span class="dot bad"></span><span>Sin datos todavía</span>';
-        $("kpis").outerHTML = `<div class="panel empty"><b>Esperando la primera actualización.</b><span>Ejecuta el flujo “Radar MEXC” en la pestaña Actions de GitHub; en unos minutos este panel se llenará solo.</span></div>`;
-      }
+      if (!D) { $("status").innerHTML = '<span class="dot bad"></span><span>Sin datos todavía</span>'; $("plan").innerHTML = '<div class="empty"><b>Esperando la primera actualización.</b><span>Ejecuta el flujo “Radar MEXC” en la pestaña Actions de GitHub; en unos minutos el panel se llena solo.</span></div>'; }
     }
   }
-  // Precio en vivo directo desde MEXC, si el navegador lo permite
   async function precioVivo() {
     if (!D || vivoOk === false) return;
     try {
-      const r = await fetch("https://contract.mexc.com/api/v1/contract/ticker", { cache: "no-store" });
-      const j = await r.json();
-      const pares = new Set(D.pares.map((p) => p.par).concat(D.activas.map((s) => s.par)));
-      (j.data || []).forEach((t) => { if (pares.has(t.symbol)) vivo[t.symbol] = Number(t.lastPrice); });
-      vivoOk = true;
-      pintarActivas(); pintarRadar(); pintarEstado();
-      const p = D.pares.find((x) => x.par === sel);
-      const tit = document.querySelector("#d-head .title .num");
-      if (p && tit) tit.innerHTML = `${px(precioDe(p.par))} <span class="${cls(p.cambio24)}">${pc(p.cambio24, 2)}</span>`;
+      const j = await fetch("https://contract.mexc.com/api/v1/contract/ticker", { cache: "no-store" }).then((r) => r.json());
+      const set = new Set(D.pares.map((p) => p.par).concat(D.activas.map((s) => s.par)));
+      (j.data || []).forEach((t) => { if (set.has(t.symbol)) vivo[t.symbol] = Number(t.lastPrice); });
+      vivoOk = true; pintarStrip(); pintarActivas(); pintarEstado(); const p = par(sel); if (p) pintarCabecera(p);
     } catch (e) { vivoOk = false; pintarEstado(); }
   }
   $("refresh").addEventListener("click", () => { cargar(); precioVivo(); });
-  new MutationObserver(recolorear).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", recolorear);
+  new MutationObserver(() => { colorear(); if (D && sel) pintarGrafico(par(sel)); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { colorear(); if (D && sel) pintarGrafico(par(sel)); });
   cargar().then(precioVivo);
-  setInterval(cargar, 60000);
-  setInterval(precioVivo, 10000);
-  setInterval(pintarEstado, 30000);
+  setInterval(cargar, 60000); setInterval(precioVivo, 10000); setInterval(pintarEstado, 30000);
 })();
 </script>
 </body>
