@@ -213,7 +213,7 @@
   }
   function marcas() {
     const tiempos = new Set(serie.map((x) => x[0])), seg = TF[tf].seg, m = [], p = parD(sel);
-    if (ON.hist && p && (tf === "1H" || tf === "4H")) { const letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S", mtf: "M", barrida: "L", compresion: "C", zona: "Z" }; p.marcas.forEach((x) => { const t = Math.floor(x.t / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: x.lado === 1 ? "belowBar" : "aboveBar", color: x.r > 0 ? css("--up") : css("--down"), shape: x.lado === 1 ? "arrowUp" : "arrowDown", text: letra[x.clave] || "" }); }); }
+    if (ON.hist && p && (tf === "1H" || tf === "4H")) { const letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S", mtf: "M", barrida: "L", compresion: "C", zona: "Z", ruptura_viernes: "V" }; p.marcas.forEach((x) => { const t = Math.floor(x.t / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: x.lado === 1 ? "belowBar" : "aboveBar", color: x.r > 0 ? css("--up") : css("--down"), shape: x.lado === 1 ? "arrowUp" : "arrowDown", text: letra[x.clave] || "" }); }); }
     if (D) D.activas.filter((a) => a.par === sel).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "SEÑAL" }); });
     (calc.div || []).forEach((d) => m.push({ time: d.t, position: d.tipo === "bajista" ? "aboveBar" : "belowBar", color: d.tipo === "bajista" ? css("--down") : css("--up"), shape: "square", text: "Div" }));
     sC.setMarkers(m.sort((a, b) => a.time - b.time));

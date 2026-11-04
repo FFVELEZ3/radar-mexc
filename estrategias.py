@@ -35,13 +35,26 @@ def cond_retroceso(d):
     return largo, corto
 
 
+def _dia_entrada(d):
+    """Día (UTC, 0 = lunes) en que se entra: la apertura de la vela siguiente a la señal."""
+    return pd.Series((d.index + pd.Timedelta(hours=1)).dayofweek, index=d.index)
+
+
+def _entre_semana(d):
+    # Medido en un año y 20 pares: las rupturas en sábado y domingo pierden ~-0.32R por operación
+    # en la parte antigua y en la reciente (poco volumen, rupturas falsas).
+    return _dia_entrada(d) < 5
+
+
 def cond_ruptura(d):
     largo = {
+        "Entre semana (sin rupturas en fin de semana)": _entre_semana(d),
         "Precio 4h sobre su EMA50": d["c4"] > d["ema50_4"],
         "Cierra sobre el máximo de 20 velas": d["close"] > d["max20"],
         "Tendencia con fuerza (ADX > 20)": d["adx"] > 20,
     }
     corto = {
+        "Entre semana (sin rupturas en fin de semana)": _entre_semana(d),
         "Precio 4h bajo su EMA50": d["c4"] < d["ema50_4"],
         "Cierra bajo el mínimo de 20 velas": d["close"] < d["min20"],
         "Tendencia con fuerza (ADX > 20)": d["adx"] > 20,
@@ -116,12 +129,14 @@ def cond_compresion(d):
     estrecha = d["bb_pct"].rolling(6).min() < 0.15
     volumen = d["vol"] > 1.5 * d["vol_media"]
     largo = {
+        "Entre semana (sin rupturas en fin de semana)": _entre_semana(d),
         "Diario no bajista": ~_diario_bajista(d),
         "Bandas muy estrechas hace poco": estrecha,
         "Cierra sobre la banda superior": d["close"] > d["bb_sup"],
         "Volumen 1.5x sobre su media": volumen,
     }
     corto = {
+        "Entre semana (sin rupturas en fin de semana)": _entre_semana(d),
         "Diario no alcista": ~_diario_alcista(d),
         "Bandas muy estrechas hace poco": estrecha,
         "Cierra bajo la banda inferior": d["close"] < d["bb_inf"],
@@ -147,6 +162,17 @@ def cond_zona(d):
         "Vela de rechazo (cierre en la mitad baja)": (d["high"] - d["close"]) / rango > 0.6,
         "RSI agotado (> 60 en las últimas 3 velas)": d["rsi"].rolling(3).max() > 60,
     }
+    return largo, corto
+
+
+def cond_ruptura_viernes(d):
+    """Candidata: la ruptura de rango solo los viernes (UTC). En el análisis por día ganó
+    +0.19R en 556 operaciones, positiva en la parte antigua y en la reciente del año.
+    Se valida igual que las demás; mientras no pase los filtros, solo se observa."""
+    largo, corto = cond_ruptura(d)
+    viernes = _dia_entrada(d) == 4
+    largo = {"Es viernes": viernes, **{k: v for k, v in largo.items() if not k.startswith("Entre semana")}}
+    corto = {"Es viernes": viernes, **{k: v for k, v in corto.items() if not k.startswith("Entre semana")}}
     return largo, corto
 
 
@@ -181,6 +207,7 @@ CONDICIONES = {
     "barrida": ("Barrida de liquidez", cond_barrida),
     "compresion": ("Compresión y ruptura", cond_compresion),
     "zona": ("Rebote en soporte/resistencia", cond_zona),
+    "ruptura_viernes": ("Ruptura de rango · viernes", cond_ruptura_viernes),
 }
 
 ESTRATEGIAS = {k: (n, senal_desde(f)) for k, (n, f) in CONDICIONES.items()}
