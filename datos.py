@@ -55,10 +55,22 @@ def tickers():
     return salida
 
 
+# MEXC también lista futuros de acciones, ETF y metales. No son cripto, operan con
+# horarios y noticias distintos, y muchos tienen poco historial: se excluyen.
+NO_CRIPTO = {"XAU", "XAG", "GOLD", "SILVER", "PAXG", "XAUT", "COPPER", "OIL", "WTI", "BRENT",
+             "NATGAS", "SOXL", "TQQQ", "SQQQ", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "MSFT",
+             "AMZN", "GOOGL", "META", "COIN", "MSTR", "HOOD", "CRCL"}
+
+
+def es_cripto(simbolo):
+    base = simbolo.replace("_USDT", "")
+    return "STOCK" not in base and base not in NO_CRIPTO
+
+
 def pares_top(n, excluir=(), info=None):
-    """Contratos perpetuos USDT con mayor volumen negociado en 24 h (en USDT)."""
+    """Contratos perpetuos USDT de cripto con mayor volumen negociado en 24 h (en USDT)."""
     info = info if info is not None else tickers()
-    filas = [(s, v["volumen24"]) for s, v in info.items() if s not in excluir]
+    filas = [(s, v["volumen24"]) for s, v in info.items() if s not in excluir and es_cripto(s)]
     filas.sort(key=lambda x: x[1], reverse=True)
     return [s for s, _ in filas[:n]]
 
