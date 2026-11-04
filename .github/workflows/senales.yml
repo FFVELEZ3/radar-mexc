@@ -1,0 +1,65 @@
+name: Radar MEXC
+
+on:
+  schedule:
+    - cron: "2,17,32,47 * * * *"   # cada 15 minutos
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: "senales = analizar ahora · prueba = mensaje de prueba · backtest = solo reporte"
+        required: true
+        default: senales
+        type: choice
+        options: [senales, prueba, backtest]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: radar
+  cancel-in-progress: false
+
+jobs:
+  analizar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+      TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      RIESGO_POR_OPERACION_USD: ${{ vars.RIESGO_POR_OPERACION_USD }}
+      APALANCAMIENTO: ${{ vars.APALANCAMIENTO }}
+      NUM_PARES: ${{ vars.NUM_PARES }}
+      MIN_T: ${{ vars.MIN_T }}
+      HORA_RESUMEN: ${{ vars.HORA_RESUMEN }}
+      MEXC_API_KEY: ${{ secrets.MEXC_API_KEY }}
+      MEXC_API_SECRET: ${{ secrets.MEXC_API_SECRET }}
+      MODO: ${{ vars.MODO }}
+      MAX_POSICIONES: ${{ vars.MAX_POSICIONES }}
+      LIMITE_PERDIDA_DIARIA: ${{ vars.LIMITE_PERDIDA_DIARIA }}
+      LIMITE_PERDIDA_MENSUAL: ${{ vars.LIMITE_PERDIDA_MENSUAL }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Analizar mercado
+        run: python main.py ${{ github.event.inputs.modo || 'senales' }}
+
+      - name: Publicar datos en el panel
+        if: always()
+        run: |
+          git config user.name "radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data 2>/dev/null || exit 0
+          if git diff --cached --quiet; then echo "Sin cambios"; exit 0; fi
+          git commit -m "Actualizar datos del radar" -q
+          for i in 1 2 3; do
+            git pull --rebase -q -X theirs && git push -q && exit 0
+            sleep 5
+          done
+          exit 1
