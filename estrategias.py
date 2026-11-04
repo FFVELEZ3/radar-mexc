@@ -1,4 +1,4 @@
-"""Estrategias en velas de 1h con filtro de tendencia en 4h.
+"""Estrategias en velas de 1h con filtros de temporalidades mayores (4h y diario).
 
 Cada estrategia se define como una lista de condiciones para LONG y otra para
 SHORT. La señal aparece cuando se cumplen todas; el panel muestra cuántas se
@@ -64,6 +64,72 @@ def cond_rebote_rsi(d):
     return largo, corto
 
 
+def _diario_alcista(d):
+    return (d["cd"] > d["ema50_d"]) & (d["ema20_d"] > d["ema50_d"])
+
+
+def _diario_bajista(d):
+    return (d["cd"] < d["ema50_d"]) & (d["ema20_d"] < d["ema50_d"])
+
+
+def cond_mtf(d):
+    """Análisis de arriba abajo: diario y 4h marcan la dirección, 1h da la entrada."""
+    toca50 = d["low"].rolling(5).min() <= d["ema50"] + 0.3 * d["atr"]
+    toca50c = d["high"].rolling(5).max() >= d["ema50"] - 0.3 * d["atr"]
+    largo = {
+        "Diario alcista (precio y EMA20 sobre EMA50)": _diario_alcista(d),
+        "4h alcista (sobre su EMA20 y EMA50)": (d["c4"] > d["ema20_4"]) & (d["ema20_4"] > d["ema50_4"]),
+        "1h retrocedió hasta la EMA50": toca50,
+        "RSI 1h recupera 50": (d["rsi"].shift() < 50) & (d["rsi"] >= 50),
+        "Cierra sobre la EMA20 de 1h": d["close"] > d["ema20"],
+    }
+    corto = {
+        "Diario bajista (precio y EMA20 bajo EMA50)": _diario_bajista(d),
+        "4h bajista (bajo su EMA20 y EMA50)": (d["c4"] < d["ema20_4"]) & (d["ema20_4"] < d["ema50_4"]),
+        "1h rebotó hasta la EMA50": toca50c,
+        "RSI 1h pierde 50": (d["rsi"].shift() > 50) & (d["rsi"] <= 50),
+        "Cierra bajo la EMA20 de 1h": d["close"] < d["ema20"],
+    }
+    return largo, corto
+
+
+def cond_barrida(d):
+    """Barrida de liquidez: el precio perfora el mínimo (máximo) del día anterior y vuelve."""
+    rango = (d["high"] - d["low"]).replace(0, np.nan)
+    largo = {
+        "4h no bajista (sobre su EMA200)": d["c4"] > d["ema200_4"],
+        "Perforó el mínimo de ayer": d["low"] < d["pdl"],
+        "Cerró de vuelta sobre el mínimo de ayer": d["close"] > d["pdl"],
+        "Cierre en la mitad alta de la vela": (d["close"] - d["low"]) / rango > 0.6,
+    }
+    corto = {
+        "4h no alcista (bajo su EMA200)": d["c4"] < d["ema200_4"],
+        "Perforó el máximo de ayer": d["high"] > d["pdh"],
+        "Cerró de vuelta bajo el máximo de ayer": d["close"] < d["pdh"],
+        "Cierre en la mitad baja de la vela": (d["high"] - d["close"]) / rango > 0.6,
+    }
+    return largo, corto
+
+
+def cond_compresion(d):
+    """Compresión de volatilidad (bandas de Bollinger estrechas) y ruptura con volumen."""
+    estrecha = d["bb_pct"].rolling(6).min() < 0.15
+    volumen = d["vol"] > 1.5 * d["vol_media"]
+    largo = {
+        "Diario no bajista": ~_diario_bajista(d),
+        "Bandas muy estrechas hace poco": estrecha,
+        "Cierra sobre la banda superior": d["close"] > d["bb_sup"],
+        "Volumen 1.5x sobre su media": volumen,
+    }
+    corto = {
+        "Diario no alcista": ~_diario_alcista(d),
+        "Bandas muy estrechas hace poco": estrecha,
+        "Cierra bajo la banda inferior": d["close"] < d["bb_inf"],
+        "Volumen 1.5x sobre su media": volumen,
+    }
+    return largo, corto
+
+
 def _todas(conds):
     return pd.concat([s.fillna(False).astype(bool) for s in conds.values()], axis=1).all(axis=1)
 
@@ -91,6 +157,9 @@ CONDICIONES = {
     "retroceso": ("Retroceso en tendencia", cond_retroceso),
     "ruptura": ("Ruptura de rango", cond_ruptura),
     "rebote_rsi": ("Rebote de RSI", cond_rebote_rsi),
+    "mtf": ("Arriba-abajo (D → 4h → 1h)", cond_mtf),
+    "barrida": ("Barrida de liquidez", cond_barrida),
+    "compresion": ("Compresión y ruptura", cond_compresion),
 }
 
 ESTRATEGIAS = {k: (n, senal_desde(f)) for k, (n, f) in CONDICIONES.items()}
