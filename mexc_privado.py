@@ -28,10 +28,15 @@ def firma(api_key, secret, marca_tiempo, parametros):
 
 
 class ClienteMexc:
-    def __init__(self, api_key, secret, sesion=None):
+    def __init__(self, api_key, secret, sesion=None, permitir_ordenes=False):
         self.api_key, self.secret = api_key, secret
         self.s = sesion or requests.Session()
         self._detalles = {}
+        self.permitir_ordenes = permitir_ordenes
+
+    def _exigir_permiso(self):
+        if not self.permitir_ordenes:
+            raise ErrorMexc("Órdenes bloqueadas: el bot está en modo solo lectura (PERMITIR_ORDENES=no).")
 
     # ---------- transporte ----------
     def _privado(self, metodo, ruta, params=None):
@@ -78,6 +83,13 @@ class ClienteMexc:
         d = self._privado("GET", "/api/v1/private/account/asset/USDT")
         return float(d.get("availableBalance") or 0)
 
+    def cuenta(self):
+        """Saldo de futuros en USDT: disponible, patrimonio y PnL no realizado."""
+        d = self._privado("GET", "/api/v1/private/account/asset/USDT") or {}
+        f = lambda k: float(d.get(k) or 0)
+        return {"disponible": f("availableBalance"), "patrimonio": f("equity"),
+                "no_realizado": f("unrealized"), "margen_usado": f("positionMargin")}
+
     def posiciones(self):
         return self._privado("GET", "/api/v1/private/position/open_positions") or []
 
@@ -92,6 +104,7 @@ class ClienteMexc:
     # ---------- acciones ----------
     def abrir(self, simbolo, lado, vol, precio, apalancamiento, stop, objetivo, oid):
         """Orden a mercado con stop y take profit adjuntos, margen aislado."""
+        self._exigir_permiso()
         return self._privado("POST", "/api/v1/private/order/submit", {
             "symbol": simbolo, "price": precio, "vol": vol,
             "leverage": int(apalancamiento), "side": 1 if lado == 1 else 3,
@@ -101,6 +114,7 @@ class ClienteMexc:
 
     def cerrar(self, simbolo, lado, vol, precio, position_id, oid):
         """Cierra a mercado una posición (cierre por tiempo)."""
+        self._exigir_permiso()
         return self._privado("POST", "/api/v1/private/order/submit", {
             "symbol": simbolo, "price": precio, "vol": vol, "side": 4 if lado == 1 else 2,
             "type": 5, "openType": 1, "positionId": position_id, "externalOid": oid,

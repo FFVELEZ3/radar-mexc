@@ -44,6 +44,9 @@ APALANCAMIENTO = _num("APALANCAMIENTO", 3)
 # auto     = papel hasta que el historial demuestre ventaja, luego real (recomendado);
 # real     = opera siempre en real (los frenos de abajo siguen activos).
 MODO = os.getenv("MODO", "auto").strip().lower() or "auto"
+# Seguro principal: mientras no sea "si", el bot NUNCA envía órdenes a MEXC aunque la clave
+# lo permita; solo lee saldo y posiciones (modo "solo lectura").
+PERMITIR_ORDENES = os.getenv("PERMITIR_ORDENES", "no").strip().lower() in ("si", "sí", "1", "true", "yes")
 MIN_SENALES_PARA_REAL = _num("MIN_SENALES_PARA_REAL", 30)  # cerradas en papel
 VENTANA_PAUSA = 20               # si las últimas 20 cerradas pierden en promedio, vuelve a papel
 MAX_POSICIONES = _num("MAX_POSICIONES", 2)

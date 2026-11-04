@@ -61,7 +61,7 @@ def url_panel():
 
 def crear_cliente():
     clave, secreto = os.getenv("MEXC_API_KEY", "").strip(), os.getenv("MEXC_API_SECRET", "").strip()
-    return ClienteMexc(clave, secreto) if clave and secreto else None
+    return ClienteMexc(clave, secreto, permitir_ordenes=C.PERMITIR_ORDENES) if clave and secreto else None
 
 
 def cargar_estado():
@@ -126,6 +126,7 @@ def mensaje_senal(s, r, modo="simulado"):
     lado, entrada = s["lado"], s["entrada"]
     etiqueta = {"real": "🤖 El bot intentará abrirla en real (aviso aparte).",
                 "simulado": "📝 En papel: el bot la sigue sin dinero real.",
+                "lectura": "👀 Solo lectura: el bot no abre nada en MEXC; la decisión es tuya.",
                 "apagado": "Bot apagado: solo aviso."}.get(modo, "")
     t, oos = r["m"]["total"], r["m"]["oos"]
     dist = s["riesgo"] / entrada
@@ -348,6 +349,18 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         if estado.get("modo_bot"):
             telegram.enviar(f"🔁 Modo del bot: <b>{bot['modo'].upper()}</b>. {bot['motivo']}")
         estado["modo_bot"] = bot["modo"]
+    con = bot.get("conexion")
+    if con is not None:
+        clave_con = "ok" if con.get("ok") else "error"
+        if clave_con != estado.get("conexion_mexc"):
+            if con.get("ok"):
+                telegram.enviar(f"✅ <b>Conectado a MEXC</b> ({'puede operar' if bot.get('ordenes') else 'solo lectura'}).\n"
+                                f"Saldo futuros: {con['patrimonio']:.2f} USDT · disponible {con['disponible']:.2f} · "
+                                f"{len(con['posiciones'])} posiciones abiertas.")
+            else:
+                telegram.enviar(f"⚠️ <b>No pude conectar con tu cuenta de MEXC</b>: {con.get('error')}\n"
+                                "Revisa que la clave y el secreto estén bien copiados en GitHub.")
+            estado["conexion_mexc"] = clave_con
 
     # 4. Resumen diario
     rend = seguimiento.rendimiento([s for s in senales if not s.get("observacion")])

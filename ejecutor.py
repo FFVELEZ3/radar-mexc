@@ -47,6 +47,9 @@ def decidir_modo(senales, hay_cliente):
         return "simulado", "Modo simulado fijo: opera solo en papel.", progreso
     if not hay_cliente:
         return "simulado", "Faltan las claves de API de MEXC: opera en papel.", progreso
+    if not C.PERMITIR_ORDENES:
+        return "lectura", ("Conectado a MEXC en solo lectura: ve tu saldo y posiciones, "
+                           "pero no envía órdenes. Las señales se siguen en papel."), progreso
     if C.MODO == "real":
         return "real", "Modo real forzado por configuración.", progreso
     # auto
@@ -252,7 +255,8 @@ def abrir_senal(cliente, s, senales, precios, ahora, avisar):
 def procesar(cliente, senales, nuevas, precios, ahora, avisar):
     """Punto de entrada. Devuelve el estado del bot para el panel."""
     modo, motivo, progreso = decidir_modo(senales, cliente is not None)
-    if cliente is not None and modo != "apagado":
+    conexion = leer_cuenta(cliente) if cliente is not None else None
+    if cliente is not None and modo not in ("apagado", "lectura"):
         try:
             conciliar(cliente, senales, precios, ahora, avisar)
         except ErrorMexc as e:
@@ -260,5 +264,22 @@ def procesar(cliente, senales, nuevas, precios, ahora, avisar):
     if modo == "real":
         for s in nuevas:
             abrir_senal(cliente, s, senales, precios, ahora, avisar)
-    return {"modo": modo, "motivo": motivo, "progreso": progreso,
-            "configurado": C.MODO, "real": resumen_real(senales, ahora)}
+    return {"modo": modo, "motivo": motivo, "progreso": progreso, "conexion": conexion,
+            "ordenes": C.PERMITIR_ORDENES, "configurado": C.MODO, "real": resumen_real(senales, ahora)}
+
+
+def leer_cuenta(cliente):
+    """Solo consultas: comprueba que las claves funcionan y trae saldo y posiciones abiertas."""
+    try:
+        cta = cliente.cuenta()
+        pos = []
+        for p in cliente.posiciones():
+            pos.append({"par": p.get("symbol"), "lado": 1 if int(p.get("positionType") or 1) == 1 else -1,
+                        "vol": float(p.get("holdVol") or 0),
+                        "entrada": float(p.get("holdAvgPrice") or p.get("openAvgPrice") or 0),
+                        "apal": int(p.get("leverage") or 0),
+                        "liquidacion": float(p.get("liquidatePrice") or 0),
+                        "margen": float(p.get("im") or p.get("oim") or 0)})
+        return {"ok": True, **{k: round(v, 4) for k, v in cta.items()}, "posiciones": pos}
+    except Exception as e:  # claves mal copiadas, permisos o MEXC caído: no detiene el radar
+        return {"ok": False, "error": str(e)[:200]}

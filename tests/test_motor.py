@@ -120,3 +120,36 @@ if __name__ == "__main__":
     test_sin_mirar_al_futuro()
     test_simulacion_manual()
     test_flujo_completo()
+
+
+def test_solo_lectura_bloquea_ordenes():
+    import ejecutor
+    from mexc_privado import ClienteMexc, ErrorMexc
+
+    class SesionFalsa:
+        def __init__(self): self.llamadas = []
+        def request(self, metodo, url, **kw):
+            self.llamadas.append((metodo, url))
+            class R:
+                status_code = 200
+                def json(self_):
+                    if "asset" in url:
+                        return {"success": True, "data": {"availableBalance": 50, "equity": 60, "unrealized": -1.5, "positionMargin": 10}}
+                    return {"success": True, "data": [{"symbol": "BTC_USDT", "positionType": 2, "holdVol": 3, "holdAvgPrice": 70000, "leverage": 5, "liquidatePrice": 80000}]}
+            return R()
+
+    ses = SesionFalsa()
+    cli = ClienteMexc("k", "s", sesion=ses)              # por defecto NO permite órdenes
+    for accion in (lambda: cli.abrir("BTC_USDT", 1, 1, 1, 3, 0.9, 1.1, "x"),
+                   lambda: cli.cerrar("BTC_USDT", 1, 1, 1, 1, "x")):
+        try:
+            accion(); assert False, "debió bloquear la orden"
+        except ErrorMexc as e:
+            assert "solo lectura" in str(e)
+    assert not any(m == "POST" for m, _ in ses.llamadas)  # nunca llegó a enviar nada
+    con = ejecutor.leer_cuenta(cli)
+    assert con["ok"] and con["patrimonio"] == 60 and con["posiciones"][0]["lado"] == -1
+    assert C.PERMITIR_ORDENES is False
+    modo, _, _ = ejecutor.decidir_modo([], True)
+    assert modo in ("lectura", "simulado", "apagado")    # con claves y sin permiso, jamás "real"
+    assert not any(m == "POST" for m, _ in ses.llamadas)

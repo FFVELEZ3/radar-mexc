@@ -14,6 +14,16 @@ from mexc_privado import ClienteMexc, ErrorMexc
 
 AHORA = datetime(2026, 11, 3, 20, 2, tzinfo=timezone.utc)
 
+try:
+    import pytest
+
+    @pytest.fixture(autouse=True)
+    def _ordenes_permitidas(monkeypatch):
+        """Estas pruebas cubren la operación real con un MEXC falso: habilitan el permiso solo aquí."""
+        monkeypatch.setattr(C, "PERMITIR_ORDENES", True)
+except ImportError:  # ejecución directa sin pytest
+    pass
+
 
 class MexcFalso:
     def __init__(self, saldo=100.0, minimo=1):
@@ -78,7 +88,7 @@ def test_firma():
                     return {"success": True, "code": 0, "data": 123}
             return R()
 
-    c = ClienteMexc("CLAVE", "SECRETO", Sesion())
+    c = ClienteMexc("CLAVE", "SECRETO", Sesion(), permitir_ordenes=True)
     c.abrir("BTC_USDT", 1, 3, 50000.0, 3, 49400.0, 51200.0, "rmabc")
     h = capturado["headers"]
     esperado = hmac.new(b"SECRETO", f"CLAVE{h['Request-Time']}{capturado['data']}".encode(),
@@ -198,6 +208,7 @@ def test_error_mexc():
 
 
 if __name__ == "__main__":
+    C.PERMITIR_ORDENES = True
     test_firma()
     test_modo()
     test_apertura_y_frenos()
