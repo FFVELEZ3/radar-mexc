@@ -66,4 +66,6 @@ DIR_DATOS = os.getenv("DIR_DATOS", "docs/data")
 # --- Avisos ---
 ZONA_HORARIA = os.getenv("ZONA_HORARIA", "America/Guayaquil")
 HORA_RESUMEN = _num("HORA_RESUMEN", 8)   # hora local del resumen diario
+# Avisar también los setups SIN ventaja comprobada (solo para estudiar, marcados como tales)
+AVISAR_OBSERVACION = os.getenv("AVISAR_OBSERVACION", "no").strip().lower() in ("si", "sí", "1", "true", "yes")
 MAX_DISTANCIA_ATR = 0.5  # si el precio se alejó más de 0.5 ATR de la entrada, no entrar
