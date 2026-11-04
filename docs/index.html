@@ -148,6 +148,14 @@ h2 { margin: 0; font: 700 15px/1.2 var(--f-display); font-stretch: 112%; text-tr
 .conds li { display: grid; grid-template-columns: 18px 1fr; gap: 6px; align-items: start; color: var(--muted); }
 .conds li.ok { color: var(--fg); } .conds svg { width: 16px; height: 16px; margin-top: 1px; }
 .why { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.gates { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.gates li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; }
+.gates svg { width: 16px; height: 16px; margin-top: 2px; }
+.gates b { display: block; font-weight: 600; font-size: 13px; }
+.gates span { font-size: 12.5px; color: var(--muted); }
+.concl { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; }
+.spark { width: 100%; height: 56px; display: block; margin-top: 8px; }
+.sig.obs { border-left-style: dashed; }
 
 /* Matriz de setups */
 .mx { overflow-x: auto; }
@@ -268,7 +276,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
 
   <section class="panel" aria-label="Resultados">
     <div class="tabs" role="tablist">
-      <button class="tab" role="tab" id="t-hist" aria-selected="true" aria-controls="p-hist">Historial de señales</button>
+      <button class="tab" role="tab" id="t-hist" aria-selected="true" aria-controls="p-hist">Ganadas y perdidas</button>
       <button class="tab" role="tab" id="t-real" aria-selected="false" aria-controls="p-real">Operaciones reales</button>
       <button class="tab" role="tab" id="t-bt" aria-selected="false" aria-controls="p-bt">Backtest</button>
       <button class="tab" role="tab" id="t-cfg" aria-selected="false" aria-controls="p-cfg">Cómo funciona</button>
@@ -291,7 +299,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  let D = null, sel = null, vivo = {}, vivoOk = null, tf = 1;
+  let D = null, sel = null, vivo = {}, wsOk = false, tf = 1;
   const estSel = {};               // estrategia elegida por par
   const vis = { niveles: true, ema: true, vol: true, hist: true };
   let zona = "America/Guayaquil";
@@ -326,7 +334,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     if (!D) return;
     const min = (Date.now() - new Date(D.generado)) / 60000;
     const tipo = min < D.intervalo_min * 2.2 ? "" : min < D.intervalo_min * 6 ? "warn" : "bad";
-    $("status").innerHTML = `<span class="dot ${tipo}"></span><span>Análisis ${hace(D.generado)} · próximo ${hora(D.proxima)}${vivoOk ? " · precio en vivo" : ""}</span>`;
+    $("status").innerHTML = `<span class="dot ${tipo}"></span><span>Análisis ${hace(D.generado)} · próximo ${hora(D.proxima)}${wsOk ? " · en vivo" : ""}</span>`;
   }
 
   // ---------- franja de pares ----------
@@ -373,6 +381,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     $("plan").innerHTML = `
       <div><div class="label" style="margin-bottom:8px">Estrategia</div><div class="stabs">${p.estrategias.map((x) => `<button class="stab" type="button" data-k="${x.clave}" aria-pressed="${x.clave === e.clave && !pl.activa}"><span>${esc(x.nombre)}</span>${segs(x)}</button>`).join("")}</div></div>
       <div class="verdict">${ring(pl.activa ? e.total : e.cumplidas, e.total, color)}<div><b>${titulo}</b><p>${texto}</p></div></div>
+      ${pl.activa ? "" : `<div><div class="label" style="margin-bottom:10px">Para ser señal confirmada se necesitan las dos</div>${requisitos(p, e)}</div>`}
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">${ladoChip(pl.lado)}<span class="muted" style="font-size:12px">${esc(pl.nombre)}</span></div>
         <div class="ladder">
@@ -391,15 +400,41 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       </div>
       <div><div class="label">Condiciones ${e.cumplidas}/${e.total} · ${e.lado === 1 ? "para LONG" : "para SHORT"}</div>
         <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
-      <div><div class="label" style="margin-bottom:8px">Historial de esta estrategia en ${esc(base(p.par))} (${c.dias} días)</div>
-        <div class="kv">
-          <div><span class="label">Operaciones</span><span class="num">${e.total_stats.n}</span></div>
-          <div><span class="label">Acierto</span><span class="num">${Math.round(e.total_stats.acierto * 100)}%</span></div>
-          <div><span class="label">Esperanza</span><span class="num ${cls(e.total_stats.exp_r)}">${R(e.total_stats.exp_r)}</span></div>
-          <div><span class="label">Meses recientes</span><span class="num ${cls(e.oos_stats.exp_r)}">${R(e.oos_stats.exp_r)}</span></div>
-        </div>
-        <div class="why">${e.aprobada ? `Aprobada · t = ${e.total_stats.t.toFixed(1)} · caída máxima ${e.total_stats.dd_r.toFixed(1)}R` : "No pasa el filtro: " + esc(e.motivos.join(" · "))}</div></div>`;
+      ${resultadosAnio(p, e)}`;
     $("plan").querySelectorAll(".stab").forEach((b) => b.addEventListener("click", () => { estSel[p.par] = b.dataset.k; pintarEscena(); }));
+  }
+
+  // ---------- qué falta y resultados ----------
+  function requisitos(p, e) {
+    const g1 = e.cumplidas === e.total, g2 = e.aprobada, t = e.total_stats;
+    const gan = e.ganadas ?? Math.round(t.n * t.acierto), per = t.n - gan;
+    const faltan = e.condiciones.filter(([, ok]) => !ok).map(([x]) => x);
+    const concl = g1 && g2 ? "Se cumplen las dos: es señal confirmada y te llega el aviso."
+      : g1 ? `El mercado ya cumple todo, pero esta estrategia pierde dinero en ${esc(base(p.par))}: no es señal.`
+      : g2 ? `La estrategia funciona aquí; falta que el mercado cumpla ${faltan.length === 1 ? "la condición pendiente" : "las condiciones pendientes"}.`
+      : "Ni el mercado ni la estadística la respaldan hoy.";
+    return `<ol class="gates">
+      <li>${check(g1)}<div><b>1. Condiciones del mercado: ${e.cumplidas} de ${e.total}</b><span>${g1 ? "Se cumplen todas en la última vela cerrada." : "Falta: " + faltan.map(esc).join(" · ")}</span></div></li>
+      <li>${check(g2)}<div><b>2. Ventaja comprobada: ${g2 ? "sí" : "no"}</b><span>${g2 ? `Ganó en el año y en los meses recientes (t = ${t.t.toFixed(1)}).` : `En ${t.n} operaciones del último año ganó ${gan} y perdió ${per}: ${R(t.exp_r)} por operación.`}</span></div></li>
+    </ol><p class="concl">${concl}</p>`;
+  }
+  function spark(arr) {
+    if (!arr || arr.length < 2) return "";
+    const w = 300, h = 56, min = Math.min(0, ...arr), max = Math.max(0, ...arr), rg = max - min || 1;
+    const y = (v) => (h - 4 - ((v - min) / rg) * (h - 8)).toFixed(1), x = (i) => (i / (arr.length - 1) * w).toFixed(1);
+    const col = arr[arr.length - 1] >= 0 ? "var(--up)" : "var(--down)";
+    return `<svg class="spark" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><line x1="0" x2="${w}" y1="${y(0)}" y2="${y(0)}" stroke="var(--faint)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/><polyline fill="none" stroke="${col}" stroke-width="1.8" vector-effect="non-scaling-stroke" points="${arr.map((v, i) => x(i) + "," + y(v)).join(" ")}"/></svg>`;
+  }
+  function resultadosAnio(p, e) {
+    const t = e.total_stats, c = D.config, gan = e.ganadas ?? Math.round(t.n * t.acierto), per = t.n - gan, usdT = t.total_r * c.riesgo_usd;
+    return `<div><div class="label" style="margin-bottom:8px">Si la hubieras operado el último año en ${esc(base(p.par))}</div>
+      <div class="kv">
+        <div><span class="label">Ganadas</span><span class="num up">${gan}</span></div>
+        <div><span class="label">Perdidas</span><span class="num down">${per}</span></div>
+        <div><span class="label">Resultado con $${c.riesgo_usd} por operación</span><span class="num ${cls(usdT)}">${usd(usdT)}</span></div>
+        <div><span class="label">Meses recientes</span><span class="num ${cls(e.oos_stats.exp_r)}">${R(e.oos_stats.exp_r)} por op.</span></div>
+      </div>${spark(e.curva)}
+      <div class="why">Resultado acumulado operación por operación, con comisiones. ${e.aprobada ? `Caída máxima ${t.dd_r.toFixed(1)}R.` : "Por eso no pasa el filtro: " + esc(e.motivos[0] || "")}</div></div>`;
   }
 
   // ---------- gráficos ----------
@@ -505,7 +540,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const rd = D.rendimiento, ap = D.backtest.filter((b) => b.aprobada).length, t = { alcista: 0, bajista: 0, lateral: 0 };
     D.pares.forEach((p) => t[p.tendencia]++); const n = D.pares.length || 1;
     $("kpis").innerHTML = `
-      <div class="kpi"><span class="label">Señales activas</span><span class="v">${D.activas.length}</span><span class="s">${D.activas.length ? "seguimiento cada " + D.intervalo_min + " min" : "esperando un setup con ventaja"}</span></div>
+      <div class="kpi"><span class="label">Señales activas</span><span class="v">${D.activas.length}</span><span class="s">${(D.observando || []).length} más en observación (sin ventaja)</span></div>
       <div class="kpi"><span class="label">Resultado de las señales</span><span class="v ${cls(rd.total_r)}">${rd.n ? R(rd.total_r) : "–"}</span><span class="s">${rd.n ? `${rd.n} cerradas · ${Math.round(rd.acierto * 100)}% acierto` : "aún sin señales cerradas"}</span></div>
       <div class="kpi"><span class="label">Estrategias con ventaja</span><span class="v">${ap}<span class="muted" style="font-size:.6em"> / ${D.backtest.length}</span></span><span class="s">pasan el filtro estadístico hoy</span></div>
       <div class="kpi"><span class="label">Tendencia 4h</span><span class="v" style="font-size:16px;line-height:1.5"><span class="up">${t.alcista} ▲</span> <span class="muted">·</span> <span class="down">${t.bajista} ▼</span> <span class="muted">·</span> <span class="muted">${t.lateral} ◆</span></span>
@@ -527,10 +562,11 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   function rAct(s, p) { const c = D.config; return (s.lado * (p - s.entrada) - (c.comision + c.deslizamiento) * (s.entrada + p)) / s.riesgo; }
   function pos(s, p) { const g = Math.abs(s.objetivo - s.stop); return Math.max(0, Math.min(1, s.lado === 1 ? (p - s.stop) / g : (s.stop - p) / g)) * 100; }
   function pintarActivas() {
-    $("act-note").textContent = D.activas.length ? "Toca una para verla en el gráfico" : "";
-    if (!D.activas.length) { $("activas").innerHTML = `<div class="panel empty" style="grid-column:1/-1"><b>No hay señales abiertas.</b><span>Cuando una estrategia con ventaja se active, aparecerá aquí con su seguimiento y te llegará el aviso por Telegram.</span></div>`; return; }
-    $("activas").innerHTML = D.activas.map((s) => { const p = precioDe(s.par), r = rAct(s, p); return `<button class="sig ${s.lado === 1 ? "" : "short"}" data-par="${esc(s.par)}" type="button">
-      <div class="sig-top"><span class="pair">${esc(base(s.par))}</span>${ladoChip(s.lado)}${(s.real || {}).estado === "abierta" ? '<span class="chip accent">REAL</span>' : '<span class="chip neutral">PAPEL</span>'}<span class="when">${hace(s.creada)}</span></div>
+    const lista = D.activas.concat((D.observando || []).map((s) => Object.assign({ _obs: true }, s)));
+    $("act-note").textContent = lista.length ? "Observación = sin ventaja: solo se sigue en papel, sin aviso" : "";
+    if (!lista.length) { $("activas").innerHTML = `<div class="panel empty" style="grid-column:1/-1"><b>No hay operaciones abiertas.</b><span>Cuando un setup se complete aparecerá aquí con su seguimiento. Si la estrategia tiene ventaja, además te llega el aviso por Telegram.</span></div>`; return; }
+    $("activas").innerHTML = lista.map((s) => { const p = precioDe(s.par), r = rAct(s, p); return `<button class="sig ${s.lado === 1 ? "" : "short"} ${s._obs ? "obs" : ""}" data-par="${esc(s.par)}" type="button">
+      <div class="sig-top"><span class="pair">${esc(base(s.par))}</span>${ladoChip(s.lado)}${s._obs ? '<span class="chip neutral">OBSERVACIÓN</span>' : (s.real || {}).estado === "abierta" ? '<span class="chip accent">REAL</span>' : '<span class="chip neutral">PAPEL</span>'}<span class="when">${hace(s.creada)}</span></div>
       <div class="sig-strat">${esc(s.nombre)} · ${s.stats.n} ops, ${Math.round(s.stats.acierto * 100)}% acierto</div>
       <div class="levels"><div><span class="label">Stop</span><span class="num down">${px(s.stop)}</span></div><div><span class="label">Entrada</span><span class="num">${px(s.entrada)}</span></div><div><span class="label">Objetivo</span><span class="num up">${px(s.objetivo)}</span></div></div>
       <div class="track"><div class="rail"></div><div class="tk"></div><div class="now" style="left:${pos(s, p)}%"></div></div>
@@ -540,11 +576,12 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
 
   // ---------- pestañas ----------
   function pintarHistorial() {
-    const h = D.historial, rd = D.rendimiento;
-    if (!h.length) { $("p-hist").innerHTML = `<div class="empty"><b>Todavía no hay señales cerradas.</b><span>Cada señal se sigue hasta que toca el objetivo, el stop o cumple ${D.config.velas_max} h, para comparar el resultado real con el backtest.</span></div>`; return; }
-    const tx = { objetivo: ["Objetivo", "long"], stop: ["Stop", "short"], tiempo: ["Tiempo", "neutral"] };
-    $("p-hist").innerHTML = `<div class="sum-row"><div class="stat"><span class="label">Cerradas</span><span class="num">${rd.n}</span></div><div class="stat"><span class="label">Acierto</span><span class="num">${Math.round(rd.acierto * 100)}%</span></div><div class="stat"><span class="label">Esperanza</span><span class="num ${cls(rd.exp_r)}">${R(rd.exp_r)}</span></div><div class="stat"><span class="label">Total</span><span class="num ${cls(rd.total_r)}">${R(rd.total_r)}</span></div></div>
-      <div class="scroll-x"><table class="t"><thead><tr><th>Cierre</th><th>Par</th><th>Lado</th><th>Estrategia</th><th class="r">Entrada</th><th class="r">Salida</th><th>Resultado</th><th class="r">R</th></tr></thead><tbody>${h.map((s) => `<tr><td class="num">${fecha(s.t_cierre)}</td><td><b>${esc(base(s.par))}</b></td><td>${ladoChip(s.lado)}</td><td>${esc(s.nombre)}</td><td class="num r">${px(s.entrada)}</td><td class="num r">${px(s.salida)}</td><td><span class="chip ${tx[s.estado][1]}">${tx[s.estado][0]}</span></td><td class="num r ${cls(s.r)}"><b>${R(s.r)}</b></td></tr>`).join("")}</tbody></table></div>`;
+    const h = D.historial, rd = D.rendimiento, ro = D.rendimiento_obs || {};
+    if (!h.length) { $("p-hist").innerHTML = `<div class="empty"><b>Todavía no hay operaciones cerradas.</b><span>Cada setup completo se sigue en papel hasta que toca el objetivo, el stop o cumple ${D.config.velas_max} h. Aquí verás cuántas ganó y cuántas perdió, separando las señales con ventaja de las que están en observación.</span></div>`; return; }
+    const tx = { objetivo: ["Ganó · objetivo", "long"], stop: ["Perdió · stop", "short"], tiempo: ["Cerró por tiempo", "neutral"] };
+    const bloque = (t, x) => `<div class="stat"><span class="label">${t}</span><span class="num">${x.n || 0} cerradas · ${x.n ? Math.round(x.acierto * 100) : 0}% ganadas · <span class="${cls(x.total_r)}">${x.n ? R(x.total_r) + " (" + usd(x.total_r * D.config.riesgo_usd) + ")" : "–"}</span></span></div>`;
+    $("p-hist").innerHTML = `<div class="sum-row">${bloque("Señales con ventaja", rd)}${bloque("En observación (sin ventaja)", ro)}</div>
+      <div class="scroll-x"><table class="t"><thead><tr><th>Cierre</th><th>Par</th><th>Lado</th><th>Tipo</th><th>Estrategia</th><th class="r">Entrada</th><th class="r">Salida</th><th>Resultado</th><th class="r">R</th><th class="r">Con $${D.config.riesgo_usd}</th></tr></thead><tbody>${h.map((s) => `<tr><td class="num">${fecha(s.t_cierre)}</td><td><b>${esc(base(s.par))}</b></td><td>${ladoChip(s.lado)}</td><td>${s.observacion ? '<span class="chip neutral">Observación</span>' : '<span class="chip accent">Señal</span>'}</td><td>${esc(s.nombre)}</td><td class="num r">${px(s.entrada)}</td><td class="num r">${px(s.salida)}</td><td><span class="chip ${tx[s.estado][1]}">${tx[s.estado][0]}</span></td><td class="num r ${cls(s.r)}"><b>${R(s.r)}</b></td><td class="num r ${cls(s.r)}">${usd(s.r * D.config.riesgo_usd)}</td></tr>`).join("")}</tbody></table></div>`;
   }
   function pintarReales() {
     const rs = D.reales || [];
@@ -581,7 +618,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   function pintarEscena() { const p = par(sel); if (!p) return; pintarCabecera(p); pintarPlan(p); pintarGrafico(p); pintarMatriz(); }
   function elegir(p, subir) {
     sel = p; $("strip").querySelectorAll(".pchip").forEach((b) => b.setAttribute("aria-pressed", b.dataset.par === p));
-    pintarEscena();
+    pintarEscena(); suscribirVelas();
     if (subir) document.querySelector(".stage").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
   function pintarTodo() {
@@ -599,20 +636,34 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       if (!D) { $("status").innerHTML = '<span class="dot bad"></span><span>Sin datos todavía</span>'; $("plan").innerHTML = '<div class="empty"><b>Esperando la primera actualización.</b><span>Ejecuta el flujo “Radar MEXC” en la pestaña Actions de GitHub; en unos minutos el panel se llena solo.</span></div>'; }
     }
   }
-  async function precioVivo() {
-    if (!D || vivoOk === false) return;
-    try {
-      const j = await fetch("https://contract.mexc.com/api/v1/contract/ticker", { cache: "no-store" }).then((r) => r.json());
-      const set = new Set(D.pares.map((p) => p.par).concat(D.activas.map((s) => s.par)));
-      (j.data || []).forEach((t) => { if (set.has(t.symbol)) vivo[t.symbol] = Number(t.lastPrice); });
-      vivoOk = true; pintarStrip(); pintarActivas(); pintarEstado(); const p = par(sel); if (p) pintarCabecera(p);
-    } catch (e) { vivoOk = false; pintarEstado(); }
+  // ---------- tiempo real (WebSocket público de MEXC) ----------
+  let ws, wsSym = null, ping, pend = false;
+  function refrescarPrecios() { if (pend) return; pend = true; setTimeout(() => { pend = false; pintarStrip(); pintarActivas(); const p = par(sel); if (p) pintarCabecera(p); }, 1000); }
+  function suscribirVelas() {
+    if (!ws || ws.readyState !== 1 || !sel) return;
+    if (wsSym && wsSym !== sel) ws.send(JSON.stringify({ method: "unsub.kline", param: { symbol: wsSym, interval: "Min60" } }));
+    wsSym = sel; ws.send(JSON.stringify({ method: "sub.kline", param: { symbol: sel, interval: "Min60" } }));
   }
-  $("refresh").addEventListener("click", () => { cargar(); precioVivo(); });
+  function velaViva(k) {
+    const p = par(k.symbol); if (!p || k.symbol !== sel || !chart) return;
+    const v = p.velas, nv = [k.t, k.o, k.h, k.l, k.c, k.q], u = v[v.length - 1];
+    if (u && u[0] === k.t) v[v.length - 1] = nv; else if (!u || k.t > u[0]) v.push(nv); else return;
+    const s = serie(p), b = s.v[s.v.length - 1];
+    sC.update({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] });
+    if (vis.vol) sVol.update({ time: b[0], value: b[5], color: b[4] >= b[1] ? css("--up-soft") : css("--down-soft") });
+  }
+  function conectar() {
+    if (!D || (ws && ws.readyState <= 1)) return;
+    try { ws = new WebSocket("wss://contract.mexc.com/edge"); } catch (e) { return; }
+    ws.onopen = () => { wsOk = true; D.pares.forEach((p) => ws.send(JSON.stringify({ method: "sub.ticker", param: { symbol: p.par } }))); wsSym = null; suscribirVelas(); ping = setInterval(() => { if (ws.readyState === 1) ws.send('{"method":"ping"}'); }, 15000); pintarEstado(); };
+    ws.onmessage = (m) => { let j; try { j = JSON.parse(m.data); } catch (e) { return; } if (j.channel === "push.ticker" && j.data) { vivo[j.data.symbol] = Number(j.data.lastPrice); const p = par(j.data.symbol); if (p && j.data.riseFallRate != null) p.cambio24 = Number(j.data.riseFallRate); refrescarPrecios(); } else if (j.channel === "push.kline" && j.data) velaViva(j.data); };
+    ws.onclose = () => { wsOk = false; clearInterval(ping); pintarEstado(); setTimeout(conectar, 5000); };
+  }
+  $("refresh").addEventListener("click", () => cargar());
   new MutationObserver(() => { colorear(); if (D && sel) pintarGrafico(par(sel)); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { colorear(); if (D && sel) pintarGrafico(par(sel)); });
-  cargar().then(precioVivo);
-  setInterval(cargar, 60000); setInterval(precioVivo, 10000); setInterval(pintarEstado, 30000);
+  cargar().then(conectar);
+  setInterval(cargar, 60000); setInterval(pintarEstado, 30000);
 })();
 </script>
 </body>
