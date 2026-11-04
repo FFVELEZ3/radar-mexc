@@ -93,14 +93,28 @@ def metricas(ops):
     }
 
 
-def evaluar(d, senal):
-    """Métricas totales, en muestra (70 %) y fuera de muestra (30 %) + veredicto."""
-    ops = simular(d, senal)
-    corte = d.index[0] + (d.index[-1] - d.index[0]) * C.FRACCION_EN_MUESTRA
+def _partir(ops, corte):
     if len(ops):
-        ins, oos = ops[ops["entrada_t"] < corte], ops[ops["entrada_t"] >= corte]
-    else:
-        ins = oos = ops
+        return ops[ops["entrada_t"] < corte], ops[ops["entrada_t"] >= corte]
+    return ops, ops
+
+
+def evaluar(d, senal):
+    """Métricas totales, en muestra (70 %) y fuera de muestra (30 %) + veredicto.
+
+    Con GESTION="auto" se simulan las dos formas de salir (1 objetivo o 3 objetivos) y se
+    elige la que mejor funcionó SOLO en el 70 % antiguo; el 30 % reciente la confirma o no.
+    Así la elección no usa información del periodo con el que se valida.
+    """
+    corte = d.index[0] + (d.index[-1] - d.index[0]) * C.FRACCION_EN_MUESTRA
+    modos = ["fija", "escalonada"] if C.GESTION == "auto" else [C.GESTION]
+    sims = {k: simular(d, senal, k) for k in modos}
+    def exp_ins(k):
+        ins_k = _partir(sims[k], corte)[0]
+        return metricas(ins_k)["exp_r"] if len(ins_k) else -9.0
+    modo = max(modos, key=exp_ins)
+    ops = sims[modo]
+    ins, oos = _partir(ops, corte)
     m = {"total": metricas(ops), "ins": metricas(ins), "oos": metricas(oos)}
     t = m["total"]
     motivos = []
@@ -119,10 +133,13 @@ def evaluar(d, senal):
     m["aprobada"] = not motivos
     m["motivos"] = motivos
     m["ops"] = ops
-    # comparación con la otra forma de salir (solo informativa: no decide la aprobación)
-    otro = "fija" if C.GESTION != "fija" else "escalonada"
-    m["alternativa"] = {"gestion": otro, **metricas(simular(d, senal, otro))}
-    m["gestion"] = C.GESTION
+    # comparación con la otra forma de salir (informativa)
+    otro = "escalonada" if modo == "fija" else "fija"
+    alt = sims.get(otro)
+    if alt is None:
+        alt = simular(d, senal, otro)
+    m["alternativa"] = {"gestion": otro, **metricas(alt)}
+    m["gestion"] = modo
     if len(ops):
         m["total"]["tp"] = [float((ops["tps"] >= k).mean()) for k in (1, 2, 3)]
     return m
