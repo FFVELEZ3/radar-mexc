@@ -69,6 +69,7 @@ def resumen_par(par, d, resultados_par, info):
             "condiciones": conds, "cumplidas": sum(ok for _, ok in conds), "total": len(conds),
             "senal": r["ultima_senal"],
             "total_stats": _stats(r["m"]["total"]), "oos_stats": _stats(r["m"]["oos"]),
+            "conjunto": r["m"].get("conjunto"),
         })
         ops = r["m"]["ops"]
         estrategias[-1]["curva"] = [round(x, 2) for x in ops["r"].cumsum()] if len(ops) else []
@@ -111,7 +112,8 @@ def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, err
         "par": r["par"], "clave": r["clave"], "nombre": r["nombre"],
         "aprobada": r["m"]["aprobada"], "motivos": r["m"]["motivos"],
         "total": _stats(r["m"]["total"]), "ins": _stats(r["m"]["ins"]),
-        "oos": _stats(r["m"]["oos"]),
+        "oos": _stats(r["m"]["oos"]), "conjunto": r["m"].get("conjunto"),
+        "gestion": r["m"].get("gestion"),
     } for r in resultados]
     activas = [s for s in senales if s["estado"] == "activa" and not s.get("observacion")]
     observando = [s for s in senales if s["estado"] == "activa" and s.get("observacion")]
