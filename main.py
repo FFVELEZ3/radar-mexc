@@ -22,7 +22,7 @@ import salidas
 import seguimiento
 import telegram
 from backtest import evaluar, niveles
-from estrategias import ESTRATEGIAS
+from estrategias import CONDICIONES, ESTRATEGIAS, condiciones_actuales
 from indicadores import preparar
 
 TZ = ZoneInfo(C.ZONA_HORARIA)
@@ -98,6 +98,26 @@ def analizar(info, pares, extra=()):
                 "dias": (d.index[-1] - d.index[0]).days,
             })
     return resultados, errores, por_par
+
+
+def filtro_conjunto(resultados):
+    """Filtro extra contra la suerte: con muchas combinaciones (pares x estrategias x gestión)
+    alguna puede salir buena por azar. Solo se aprueba una estrategia en un par si, además,
+    la misma estrategia gana sumando las operaciones de todos los pares vigilados."""
+    import pandas as pd
+    from backtest import metricas
+    por_clave = {}
+    for r in resultados:
+        if len(r["m"]["ops"]):
+            por_clave.setdefault(r["clave"], []).append(r["m"]["ops"])
+    conjunto = {k: metricas(pd.concat(v)) for k, v in por_clave.items()}
+    for r in resultados:
+        c = conjunto.get(r["clave"])
+        r["m"]["conjunto"] = {k: c[k] for k in ("n", "exp_r", "t")} if c else None
+        if r["m"]["aprobada"] and (not c or c["exp_r"] <= 0 or c["t"] < 1.0):
+            r["m"]["aprobada"] = False
+            r["m"]["motivos"].append("la estrategia no gana en el conjunto de pares (posible suerte)")
+    return conjunto
 
 
 # ---------- mensajes ----------
@@ -189,6 +209,16 @@ def mensaje_contraria(s, r):
             f"Resultado actual {s.get('r_actual', 0):+.2f}R. Revisa el panel; si ya tocó TP1 el stop está en la entrada.")
 
 
+def mensaje_observacion(s, r):
+    t = r["m"]["total"]
+    objs = s.get("objetivos") or [s["objetivo"]]
+    return (f"⚪ <b>Solo para estudiar</b> · {s['par']} {'LONG' if s['lado'] == 1 else 'SHORT'} · {s['nombre']}\n"
+            f"Setup completo pero <b>SIN ventaja comprobada</b> ({t['n']} ops en el año, {t['exp_r']:+.2f}R por operación). "
+            "No lo operes con dinero: el radar lo sigue en papel para medirlo.\n"
+            f"Entrada {precio(s['entrada'])} · stop {precio(s['stop'])} · "
+            + " · ".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs)))
+
+
 def mensaje_resumen(resultados, rend, errores):
     aprobadas = sorted((r for r in resultados if r["m"]["aprobada"]),
                        key=lambda r: r["m"]["total"]["exp_r"], reverse=True)
@@ -232,6 +262,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     senales = estado["senales"]
     activas_pares = {s["par"] for s in senales if s["estado"] == "activa"}
     resultados, errores, por_par = analizar(info, pares, activas_pares)
+    filtro_conjunto(resultados)
 
     reporte = (f"## Backtest {ahora.astimezone(TZ):%d/%m/%Y %H:%M}\n\n"
                f"Pares: {', '.join(pares)}\n\n{reporte_markdown(resultados)}")
@@ -293,6 +324,23 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         if not observacion:
             nuevas.append(s)
             telegram.enviar(mensaje_senal(s, r, modo_previo))
+        elif C.AVISAR_OBSERVACION:
+            telegram.enviar(mensaje_observacion(s, r))
+
+    # 2b. Pre-aviso: estrategia con ventaja a una condición de completarse
+    avisados = estado.setdefault("preavisos", [])
+    for r in resultados:
+        if not r["m"]["aprobada"] or r["ultima_senal"]:
+            continue
+        lado, conds = condiciones_actuales(CONDICIONES[r["clave"]][1], por_par[r["par"]])
+        faltan = [k for k, ok in conds if not ok]
+        marca = f"{r['par']}|{r['clave']}|{r['vela'].isoformat()}"
+        if len(faltan) == 1 and marca not in avisados:
+            avisados.append(marca)
+            telegram.enviar(f"🟡 <b>Setup formándose</b> · {r['par']} {'LONG' if lado == 1 else 'SHORT'}\n"
+                            f"{r['nombre']} (con ventaja comprobada) · falta: {faltan[0]}.\n"
+                            "Si se completa al cierre de una próxima vela, te llega la señal con entrada, stop y objetivos.")
+    del avisados[:-300]
 
     # 3. Operación automática (papel o real, con frenos)
     bot = ejecutor.procesar(cliente, senales, nuevas, precios, ahora, telegram.enviar)
