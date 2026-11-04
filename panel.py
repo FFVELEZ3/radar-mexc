@@ -113,7 +113,7 @@ def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, err
         "aprobada": r["m"]["aprobada"], "motivos": r["m"]["motivos"],
         "total": _stats(r["m"]["total"]), "ins": _stats(r["m"]["ins"]),
         "oos": _stats(r["m"]["oos"]), "conjunto": r["m"].get("conjunto"),
-        "gestion": r["m"].get("gestion"),
+        "gestion": r["m"].get("gestion"), "candidata": bool(r["m"].get("candidata")),
     } for r in resultados]
     activas = [s for s in senales if s["estado"] == "activa" and not s.get("observacion")]
     observando = [s for s in senales if s["estado"] == "activa" and s.get("observacion")]
