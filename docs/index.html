@@ -122,7 +122,17 @@ h2 { margin: 0; font: 700 15px/1.2 var(--f-display); font-stretch: 112%; text-tr
 .legend { position: absolute; left: 12px; top: 8px; z-index: 2; display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); pointer-events: none; }
 .legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 4px; }
 .legend .z { width: 10px; height: 10px; border-radius: 2px; }
-.seg .sep { width: 1px; background: var(--line); }
+.seg .sep { width: 1px; background: var(--line); flex: none; }
+.seg { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.seg button { flex: none; }
+@media (max-width: 520px) { .seg button { padding: 5px 9px; } }
+.srcapa { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 2; }
+.srz { position: absolute; display: none; border-top: 1px solid; border-bottom: 1px solid; border-radius: 2px; }
+.srz.r { background: color-mix(in srgb, var(--down) var(--a), transparent); border-color: color-mix(in srgb, var(--down) 60%, transparent); }
+.srz.s { background: color-mix(in srgb, var(--up) var(--a), transparent); border-color: color-mix(in srgb, var(--up) 60%, transparent); }
+.srz b { position: absolute; left: 6px; top: 50%; transform: translateY(-50%); font: 600 10px/1.5 "IBM Plex Mono", ui-monospace, monospace; padding: 0 6px; border-radius: 4px; color: #fff; white-space: nowrap; letter-spacing: .02em; }
+.srz.r b { background: var(--down); } .srz.s b { background: var(--up); }
+.srz.delgada b { top: auto; bottom: 2px; transform: none; }
 .subsel { position: absolute; right: 70px; top: 6px; z-index: 3; display: flex; gap: 4px; }
 .subsel button { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; font-size: 11px; padding: 2px 8px; color: var(--muted); cursor: pointer; }
 .subsel button[aria-pressed="true"] { color: var(--fg); border-color: var(--faint); }
@@ -261,7 +271,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     <div class="panel chart-card">
       <div class="c-head" id="c-head"></div>
       <div class="c-tools">
-        <div class="seg" role="group" aria-label="Temporalidad"><button type="button" data-tf="1s" aria-pressed="false">1s</button><button type="button" data-tf="5s" aria-pressed="false">5s</button><button type="button" data-tf="15s" aria-pressed="false">15s</button><span class="sep"></span><button type="button" data-tf="1m" aria-pressed="false">1m</button><button type="button" data-tf="5m" aria-pressed="false">5m</button><button type="button" data-tf="15m" aria-pressed="false">15m</button><span class="sep"></span><button type="button" data-tf="1H" aria-pressed="true">1H</button><button type="button" data-tf="4H" aria-pressed="false">4H</button></div>
+        <div class="seg" role="group" aria-label="Temporalidad"><button type="button" data-tf="1s" aria-pressed="false">1s</button><button type="button" data-tf="5s" aria-pressed="false">5s</button><button type="button" data-tf="15s" aria-pressed="false">15s</button><span class="sep"></span><button type="button" data-tf="1m" aria-pressed="false">1m</button><button type="button" data-tf="5m" aria-pressed="false">5m</button><button type="button" data-tf="15m" aria-pressed="false">15m</button><span class="sep"></span><button type="button" data-tf="1H" aria-pressed="true">1H</button><button type="button" data-tf="4H" aria-pressed="false">4H</button><span class="sep"></span><button type="button" data-tf="1D" aria-pressed="false" title="Diario">1D</button><button type="button" data-tf="1S" aria-pressed="false" title="Semanal">1S</button><button type="button" data-tf="1M" aria-pressed="false" title="Mensual">1M</button></div>
         <div class="toggles">
           <button class="tg" type="button" data-t="niveles" aria-pressed="true">Operación posible</button>
           <button class="tg" type="button" data-t="sr" aria-pressed="true">Soportes y resistencias</button>
@@ -272,7 +282,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
           <button class="tg" type="button" data-t="hist" aria-pressed="true">Entradas históricas</button>
         </div>
       </div>
-      <div class="chart-main"><div class="legend" id="legend"></div><div id="chart" style="position:absolute;inset:0"></div></div>
+      <div class="chart-main"><div class="legend" id="legend"></div><div id="chart" style="position:absolute;inset:0"></div><div class="srcapa" id="srcapa" aria-hidden="true"></div></div>
       <div class="chart-rsi"><div class="legend"><span id="sublegend">RSI 14 · zonas 30 / 70</span></div><div class="subsel" role="group" aria-label="Indicador inferior"><button type="button" data-inf="rsi" aria-pressed="true">RSI</button><button type="button" data-inf="macd" aria-pressed="false">MACD</button></div><div id="rsi" style="position:absolute;inset:0"></div></div>
       <div class="c-note" id="c-note"></div>
       <div class="flow">
@@ -336,6 +346,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     "1s": { seg: 1, src: "mx_trades" }, "5s": { seg: 5, src: "mx_trades" }, "15s": { seg: 15, src: "mx_trades" },
     "1m": { seg: 60, src: "bn", bn: "1m" }, "5m": { seg: 300, src: "bn", bn: "5m" }, "15m": { seg: 900, src: "bn", bn: "15m" },
     "1H": { seg: 3600, src: "mx" }, "4H": { seg: 14400, src: "mx" },
+    "1D": { seg: 86400, src: "bn", bn: "1d" }, "1S": { seg: 604800, src: "bn", bn: "1w" }, "1M": { seg: 2592000, src: "bn", bn: "1M" },
   };
   const cache = {};          // velas por par|tf
   const trades = {};         // operaciones recibidas por par (para segundos y flujo)
@@ -371,22 +382,61 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   function bollinger(c, n = 20, k = 2) { const up = [], lo = []; for (let i = 0; i < c.length; i++) { if (i < n - 1) { up.push(null); lo.push(null); continue; } const w = c.slice(i - n + 1, i + 1), m = w.reduce((a, b) => a + b, 0) / n, sd = Math.sqrt(w.reduce((a, b) => a + (b - m) ** 2, 0) / n); up.push(m + k * sd); lo.push(m - k * sd); } return { up, lo }; }
   function vwap(v) { let dia = null, pv = 0, vv = 0; return v.map(([t, , h, l, c, q]) => { const d = Math.floor(t / 86400); if (d !== dia) { dia = d; pv = 0; vv = 0; } pv += (h + l + c) / 3 * (q || 0); vv += q || 0; return vv ? pv / vv : null; }); }
   function macd(c) { const a = ema(c, 12), b = ema(c, 26), m = a.map((x, i) => x != null && b[i] != null ? x - b[i] : null); const first = m.findIndex((x) => x != null); const sg = first < 0 ? m.map(() => null) : m.slice(0, first).map(() => null).concat(ema(m.slice(first), 9)); return { m, sg, h: m.map((x, i) => x != null && sg[i] != null ? x - sg[i] : null) }; }
-  // Soportes y resistencias: pivotes agrupados por cercanía (0.6 ATR); fuerza = toques
+  // Soportes y resistencias: pivotes agrupados por cercanía (0.6 ATR). Cada zona es una banda
+  // que va del toque más bajo al más alto, nace en su primer toque y su fuerza = número de toques
   function zonasSR(v) {
     if (!v || v.length < 30) return { res: [], sop: [] };
     const n = v.length > 200 ? 5 : 3, piv = [];
     for (let i = n; i < v.length - n; i++) {
       let hi = true, lo = true;
       for (let j = i - n; j <= i + n; j++) { if (v[j][2] > v[i][2]) hi = false; if (v[j][3] < v[i][3]) lo = false; }
-      if (hi) piv.push(v[i][2]); if (lo) piv.push(v[i][3]);
+      if (hi) piv.push({ p: v[i][2], t: v[i][0] }); if (lo) piv.push({ p: v[i][3], t: v[i][0] });
     }
     const a = atr(v).slice(-1)[0], tol = 0.6 * a, precio = v[v.length - 1][4], gr = [];
-    piv.sort((x, y) => x - y).forEach((p) => { const g = gr[gr.length - 1]; if (g && p - g.media <= tol) { g.p.push(p); g.media = g.p.reduce((s, x) => s + x, 0) / g.p.length; } else gr.push({ p: [p], media: p }); });
-    const z = gr.filter((g) => g.p.length >= 2).map((g) => ({ precio: g.media, toques: g.p.length }));
+    piv.sort((x, y) => x.p - y.p).forEach((q) => { const g = gr[gr.length - 1]; if (g && q.p - g.media <= tol) { g.q.push(q); g.media = g.q.reduce((s, x) => s + x.p, 0) / g.q.length; } else gr.push({ q: [q], media: q.p }); });
+    const z = gr.filter((g) => g.q.length >= 2).map((g) => {
+      let lo = Math.min(...g.q.map((x) => x.p)), hi = Math.max(...g.q.map((x) => x.p));
+      if (hi - lo < 0.25 * a) { const m = (hi + lo) / 2; lo = m - 0.125 * a; hi = m + 0.125 * a; }
+      const toques = g.q.length;
+      return { precio: g.media, lo, hi, toques, t0: Math.min(...g.q.map((x) => x.t)), tN: Math.max(...g.q.map((x) => x.t)), fuerza: toques >= 4 ? "fuerte" : toques === 3 ? "media" : "débil" };
+    });
     return {
       res: z.filter((x) => x.precio > precio).sort((x, y) => x.precio - y.precio).slice(0, 3),
       sop: z.filter((x) => x.precio < precio).sort((x, y) => y.precio - x.precio).slice(0, 3),
     };
+  }
+  // dibuja las zonas como bandas sombreadas encima del gráfico (se recoloca al mover o hacer zoom)
+  let zonasVis = [];
+  function dibujarSR() {
+    const capa = $("srcapa"); if (!capa || !chart) return;
+    while (capa.children.length < zonasVis.length) { const d = document.createElement("div"); d.appendChild(document.createElement("b")); capa.appendChild(d); }
+    const ancho = capa.clientWidth - chart.priceScale("right").width(), ts = chart.timeScale(), ocupadas = [];
+    [...capa.children].forEach((el, i) => {
+      const z = zonasVis[i];
+      if (!z || !vis.sr) { el.style.display = "none"; return; }
+      const y1 = sC.priceToCoordinate(z.hi), y2 = sC.priceToCoordinate(z.lo);
+      if (y1 == null || y2 == null) { el.style.display = "none"; return; }
+      let x0 = ts.timeToCoordinate(z.t0); if (x0 == null || x0 < 0) x0 = 0;
+      const alto = Math.max(3, y2 - y1);
+      el.className = "srz " + (z.tipo === "R" ? "r" : "s") + (alto < 14 ? " delgada" : "");
+      el.style.cssText = `display:block;left:${x0}px;width:${Math.max(0, ancho - x0)}px;top:${(y1 + y2) / 2 - alto / 2}px;height:${alto}px;--a:${Math.min(34, 8 + z.toques * 4)}%`;
+      el.firstChild.textContent = `${z.tipo}${z.n} · ${z.toques} toques · ${z.fuerza}`;
+      // si la etiqueta choca con otra, se oculta (la banda se mantiene)
+      const ye = (y1 + y2) / 2, choca = ocupadas.some((y) => Math.abs(y - ye) < 16);
+      el.firstChild.style.visibility = choca ? "hidden" : "visible"; if (!choca) ocupadas.push(ye);
+    });
+  }
+  setInterval(dibujarSR, 250);
+  // niveles clave de temporalidades mayores: máximo y mínimo del día y de la semana anteriores
+  const clave = {};
+  async function nivelesClave(p) {
+    if (clave[p] !== undefined) return clave[p];
+    clave[p] = null;
+    const [d, w] = await Promise.all([binance(p, "1d", 3), binance(p, "1w", 3)]);
+    const ant = (k) => k && k.length >= 2 ? k[k.length - 2] : null, dd = ant(d), ww = ant(w);
+    clave[p] = (dd || ww) ? { pdh: dd && dd[2], pdl: dd && dd[3], pwh: ww && ww[2], pwl: ww && ww[3] } : null;
+    if (p === sel && clave[p]) niveles(par(p));
+    return clave[p];
   }
 
   // ---------- estado ----------
@@ -512,8 +562,8 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
     crosshair: { horzLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") }, vertLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") } },
   });
-  const fmtT = (t) => new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }, TF[tf].seg < 60 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
-  const tick = (t, k) => new Intl.DateTimeFormat("es-EC", k <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : Object.assign({ timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }, k === 4 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
+  const fmtT = (t) => TF[tf].seg >= 86400 ? new Intl.DateTimeFormat("es-EC", { timeZone: "UTC", day: "2-digit", month: "short", year: "numeric" }).format(new Date(t * 1000)) : new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }, TF[tf].seg < 60 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
+  const tick = (t, k) => k === 0 ? String(new Date(t * 1000).getUTCFullYear()) : k === 1 ? new Intl.DateTimeFormat("es-EC", { timeZone: "UTC", month: "short", year: "2-digit" }).format(new Date(t * 1000)) : TF[tf].seg >= 86400 ? new Intl.DateTimeFormat("es-EC", { timeZone: "UTC", day: "2-digit", month: "short" }).format(new Date(t * 1000)) : new Intl.DateTimeFormat("es-EC", k <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : Object.assign({ timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }, k === 4 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
   const linea = (o) => ({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, ...o });
   function crear() {
     if (chart) return true;
@@ -521,6 +571,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const LC = window.LightweightCharts;
     chart = LC.createChart($("chart"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
     chart.timeScale().applyOptions({ tickMarkFormatter: tick, rightOffset: 2 });
+    chart.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(dibujarSR));
     sVol = chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.86, bottom: 0 } });
     sTP = chart.addBaselineSeries(linea({ lineWidth: 1 })); sSL = chart.addBaselineSeries(linea({ lineWidth: 1 }));
@@ -597,7 +648,8 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     serieActual = v || [];
     const d = dec(p.precio), cfg = TF[tf];
     sC.applyOptions({ priceFormat: { type: "price", precision: d, minMove: Math.pow(10, -d) } });
-    chart.timeScale().applyOptions({ secondsVisible: cfg.seg < 60 });
+    chart.timeScale().applyOptions({ secondsVisible: cfg.seg < 60, timeVisible: cfg.seg < 86400 });
+    nivelesClave(p.par);
     sC.setData(serieActual.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
     indicadores(p);
     // entradas históricas (solo tienen sentido en 1H y 4H)
@@ -606,7 +658,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     D.activas.filter((a) => a.par === p.par).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / cfg.seg) * cfg.seg; if (tiempos.has(t)) marcas.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "ACTIVA" }); });
     sC.setMarkers(marcas.sort((a, b) => a.time - b.time));
     niveles(p);
-    const ver = cfg.src === "mx_trades" ? 120 : tf === "4H" ? 60 : 110, total = serieActual.length;
+    const ver = cfg.src === "mx_trades" ? 120 : tf === "4H" ? 60 : tf === "1D" ? 180 : tf === "1S" ? 110 : tf === "1M" ? 80 : 110, total = serieActual.length;
     chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - ver), to: total + (vis.niveles ? (cfg.src === "mx_trades" ? 12 : 18) : 2) });
     nota(p);
   }
@@ -625,14 +677,17 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const v = serieActual, cfg = TF[tf];
     // soportes y resistencias de la temporalidad visible
     const z = zonasSR(v);
+    zonasVis = z.res.map((x, i) => ({ ...x, tipo: "R", n: i + 1 })).concat(z.sop.map((x, i) => ({ ...x, tipo: "S", n: i + 1 })));
     if (vis.sr) {
-      z.res.forEach((x, i) => lines.push(sC.createPriceLine({ price: x.precio, color: css("--down"), lineWidth: Math.min(3, 1 + Math.floor(x.toques / 3)), lineStyle: 1, title: `R${i + 1} · ${x.toques}` })));
-      z.sop.forEach((x, i) => lines.push(sC.createPriceLine({ price: x.precio, color: css("--up"), lineWidth: Math.min(3, 1 + Math.floor(x.toques / 3)), lineStyle: 1, title: `S${i + 1} · ${x.toques}` })));
+      zonasVis.forEach((x) => lines.push(sC.createPriceLine({ price: x.precio, color: css(x.tipo === "R" ? "--down" : "--up"), lineVisible: false, axisLabelVisible: true, title: "" })));
+      const k = clave[p.par];
+      if (k && cfg.seg < 86400) [["pdh", "Máx. ayer"], ["pdl", "Mín. ayer"], ["pwh", "Máx. semana ant."], ["pwl", "Mín. semana ant."]].forEach(([c, t]) => { if (k[c]) lines.push(sC.createPriceLine({ price: k[c], color: css("--muted"), lineWidth: 1, lineStyle: 3, axisLabelVisible: false, title: t })); });
     }
+    requestAnimationFrame(dibujarSR);
     const ult = v.length ? v[v.length - 1][4] : precioDe(p.par);
-    $("srlist").innerHTML = (z.res.slice().reverse().map((x, i, a) => `<div class="srrow"><span class="chip short">R${a.length - i}</span><span class="num">${px(x.precio)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} toques</span></div>`).join("")
+    $("srlist").innerHTML = (z.res.slice().reverse().map((x, i, a) => `<div class="srrow"><span class="chip short">R${a.length - i}</span><span class="num">${px(x.lo)} – ${px(x.hi)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} · ${x.fuerza}</span></div>`).join("")
       + `<div class="srrow now"><span class="chip accent">Precio</span><span class="num">${px(ult)}</span><span></span><span></span></div>`
-      + z.sop.map((x, i) => `<div class="srrow"><span class="chip long">S${i + 1}</span><span class="num">${px(x.precio)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} toques</span></div>`).join("")) || '<span class="muted">Aún no hay suficientes velas.</span>';
+      + z.sop.map((x, i) => `<div class="srrow"><span class="chip long">S${i + 1}</span><span class="num">${px(x.lo)} – ${px(x.hi)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} · ${x.fuerza}</span></div>`).join("")) || '<span class="muted">Aún no hay suficientes velas.</span>';
     // operación posible proyectada a la derecha
     const pl = planActivo(p);
     const auto = cfg.seg < 3600 ? () => null : (o) => o();
@@ -651,13 +706,14 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const fuente = cfg.src === "mx_trades" ? `Velas de ${tf} armadas con cada operación de MEXC desde que abriste el panel (${(trades[p.par] || []).length} operaciones recibidas).`
       : cfg.src === "bn" ? (serieActual.length ? `Historial de ${tf} tomado de Binance Futures como referencia de precio (MEXC no lo entrega al navegador); se actualiza cada pocos segundos.` : "No hay historial de referencia para este par en esta temporalidad.")
       : "Velas de MEXC; la vela actual se mueve en vivo.";
+    const mayor = cfg.seg >= 86400 ? ` En ${tf === "1D" ? "diario" : tf === "1S" ? "semanal" : "mensual"} las zonas marcan los niveles grandes del mercado: úsalas para saber hacia dónde no conviene operar en contra.` : "";
     const scalp = cfg.seg < 3600 ? ` Las señales automáticas solo se calculan en 1H: en temporalidades cortas la comisión de API (≈0.22% ida y vuelta) se come entre 0.4 y 1.2 veces lo que arriesgas por operación.` : "";
-    $("c-note").innerHTML = fuente + " " + (pl.activa ? "Zonas de la <b>señal activa</b>." : `Zonas de la operación posible de <b>${esc(pl.nombre)}</b> (calculada en 1H).`) + scalp;
+    $("c-note").innerHTML = fuente + " " + (pl.activa ? "Zonas de la <b>señal activa</b>." : `Zonas de la operación posible de <b>${esc(pl.nombre)}</b> (calculada en 1H).`) + scalp + mayor;
     const lg = [];
     if (vis.ema) lg.push('<span><i style="background:var(--accent)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span><span><i style="background:var(--ema200)"></i>EMA200</span>');
     if (vis.bb) lg.push('<span><i style="background:var(--bb)"></i>Bollinger 20/2</span>');
     if (vis.vwap) lg.push('<span><i style="background:var(--vwap)"></i>VWAP</span>');
-    if (vis.sr) lg.push('<span><i style="background:var(--down)"></i>R resistencia</span><span><i style="background:var(--up)"></i>S soporte</span>');
+    if (vis.sr) lg.push('<span><i style="background:var(--down-soft);outline:1px solid var(--down)"></i>Zona de resistencia</span><span><i style="background:var(--up-soft);outline:1px solid var(--up)"></i>Zona de soporte</span>');
     $("legend").innerHTML = lg.join("");
     $("sublegend").textContent = inferior === "rsi" ? "RSI 14 · zonas 30 / 70" : "MACD 12/26/9";
   }
