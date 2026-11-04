@@ -472,9 +472,9 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   // ---------- operación posible ----------
   function planActivo(p) {
     const act = D.activas.find((s) => s.par === p.par);
-    if (act) return { activa: act, lado: act.lado, entrada: act.entrada, stop: act.stop, objetivo: act.objetivo, nombre: act.nombre };
+    if (act) return { activa: act, lado: act.lado, entrada: act.entrada, stop: act.stop, objetivo: act.objetivo, nombre: act.nombre, objetivos: act.objetivos || [act.objetivo], r_neto: act.r_neto || [], apal: act.apal_max, tps: act.tps || 0, stopAct: act.stop_actual ?? act.stop };
     const e = estrategia(p);
-    return { e, lado: e.lado, entrada: e.plan.entrada, stop: e.plan.stop, objetivo: e.plan.objetivo, nombre: e.nombre };
+    return { e, lado: e.lado, entrada: e.plan.entrada, stop: e.plan.stop, objetivo: e.plan.objetivo, nombre: e.nombre, objetivos: e.plan.objetivos || [e.plan.objetivo], r_neto: e.plan.r_neto || [], apal: e.plan.apal_max, tps: 0, stopAct: e.plan.stop };
   }
   function requisitos(p, e) {
     const g1 = e.cumplidas === e.total, g2 = e.aprobada, t = e.total_stats;
@@ -512,9 +512,10 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
         <div><span class="label">Perdidas</span><span class="num down">${per}</span></div>
         <div><span class="label">Resultado con $${c.riesgo_usd} por operación</span><span class="num ${cls(usdT)}">${usd(usdT)}</span></div>
         <div><span class="label">Meses recientes</span><span class="num ${cls(e.oos_stats.exp_r)}">${R(e.oos_stats.exp_r)} por op.</span></div>
-      </div>${spark(e.curva)}
+      </div>${t.tp ? `<div class="why" style="margin-top:8px">Llegaron a TP1 ${Math.round(t.tp[0] * 100)}% · TP2 ${Math.round(t.tp[1] * 100)}% · TP3 ${Math.round(t.tp[2] * 100)}% de las operaciones.</div>` : ""}${e.alternativa ? `<div class="why">Con ${e.alternativa.gestion === "fija" ? "un solo objetivo a 2R" : "3 objetivos"} habría dado ${R(e.alternativa.exp_r)} por operación (${e.alternativa.n} ops).</div>` : ""}${spark(e.curva)}
       <div class="why">Resultado acumulado operación por operación, con comisiones. ${e.aprobada ? `Caída máxima ${t.dd_r.toFixed(1)}R.` : "Por eso no pasa el filtro: " + esc(e.motivos[0] || "")}</div></div>`;
   }
+  const reparto = (k) => { const t = (D.config.tramos || [])[k]; return t ? ` · ${Math.round(t[1] * 100)}%` : ""; };
   function pintarPlan(p) {
     const pl = planActivo(p), e = pl.e || p.estrategias.find((x) => x.nombre === pl.nombre) || mejor(p);
     const c = D.config;
@@ -534,19 +535,22 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       <div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">${ladoChip(pl.lado)}<span class="muted" style="font-size:12px">${esc(pl.nombre)}</span></div>
         <div class="ladder">
-          <span class="tick" style="background:var(--up)"></span><span class="label">Objetivo</span><span class="num lv up">${px(pl.objetivo)}</span>
+          ${pl.objetivos.map((o, k) => [o, k]).reverse().map(([o, k]) => `<span class="tick" style="background:var(--up);opacity:${k < pl.tps ? 0.45 : 1}"></span><span class="label">${pl.objetivos.length > 1 ? `TP${k + 1}${reparto(k)}` : "Objetivo"}${k < pl.tps ? " ✓" : ""}</span><span class="num lv up">${px(o)}</span>`).join("")}
           <span class="tick" style="background:var(--accent)"></span><span class="label">${pl.activa ? "Entrada" : "Entrada (precio actual)"}</span><span class="num lv">${px(pl.entrada)}</span>
           <span class="tick" style="background:var(--down)"></span><span class="label">Stop</span><span class="num lv down">${px(pl.stop)}</span>
+          ${pl.tps ? `<span class="tick" style="background:var(--accent)"></span><span class="label">Stop protegido (tras TP1)</span><span class="num lv">${px(pl.stopAct)}</span>` : ""}
         </div>
+        ${pl.objetivos.length > 1 ? `<p class="concl" style="margin-top:10px">🔒 Al tocar TP1 se cierra la mitad y el stop pasa a la entrada: desde ahí la operación ya no puede perder.</p>` : ""}
         <div class="rr" title="Riesgo frente a beneficio"><i style="flex:${pctS / (pctS + pctT)}"></i><i style="flex:${pctT / (pctS + pctT)}"></i></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span class="down num">−${(pctS * 100).toFixed(2)}%</span><span class="muted">riesgo 1 : ${(ganancia / riesgo).toFixed(1)} beneficio</span><span class="up num">+${(pctT * 100).toFixed(2)}%</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span class="down num">−${(pctS * 100).toFixed(2)}%</span><span class="muted">riesgo 1 : ${(ganancia / riesgo).toFixed(1)} beneficio${pl.r_neto.length ? ` · neto 1 : ${pl.r_neto[pl.r_neto.length - 1].toFixed(2)}` : ""}</span><span class="up num">+${(pctT * 100).toFixed(2)}%</span></div>
       </div>
       ${nivelesPlan(p, pl)}
       <div class="kv">
         <div><span class="label">Tamaño para $${c.riesgo_usd}</span><span class="num">${cant.toPrecision(4)} ${esc(base(p.par))}</span></div>
         <div><span class="label">Margen a ${c.apalancamiento}x</span><span class="num">$${(nocional / c.apalancamiento).toFixed(2)}</span></div>
-        <div><span class="label">Si toca objetivo</span><span class="num up">${usd(c.riesgo_usd * (ganancia - costo) / riesgo)}</span></div>
-        <div><span class="label">Si toca stop</span><span class="num down">${usd(-c.riesgo_usd)}</span></div>
+        ${pl.r_neto.length ? pl.r_neto.map((x, k) => `<div><span class="label">Si llega a ${pl.r_neto.length > 1 ? "TP" + (k + 1) : "objetivo"} (neto)</span><span class="num ${cls(x)}">${usd(c.riesgo_usd * x)} · ${R(x)}</span></div>`).join("") : `<div><span class="label">Si toca objetivo</span><span class="num up">${usd(c.riesgo_usd * (ganancia - costo) / riesgo)}</span></div>`}
+        <div><span class="label">Si toca stop</span><span class="num down">${usd(-c.riesgo_usd)} · −1R</span></div>
+        <div><span class="label">Apalancamiento</span><span class="num">usa ${c.apalancamiento}x${pl.apal ? ` · máx. ${pl.apal}x` : ""}</span></div>
       </div>
       <div><div class="label">Condiciones ${e.cumplidas}/${e.total} · ${e.lado === 1 ? "para LONG" : "para SHORT"}</div>
         <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
@@ -696,7 +700,8 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       const n = cfg.src === "mx_trades" ? 12 : 18, u = v[v.length - 1][0], fut = Array.from({ length: n + 1 }, (_, i) => u + i * cfg.seg);
       sTP.applyOptions({ baseValue: { type: "price", price: pl.entrada } }); sSL.applyOptions({ baseValue: { type: "price", price: pl.entrada } });
       sTP.setData(fut.map((time) => ({ time, value: pl.objetivo }))); sSL.setData(fut.map((time) => ({ time, value: pl.stop })));
-      lines.push(sC.createPriceLine({ price: pl.objetivo, color: css("--up"), lineWidth: 1, lineStyle: 2, title: "Objetivo" }));
+      pl.objetivos.forEach((o, k) => lines.push(sC.createPriceLine({ price: o, color: css("--up"), lineWidth: 1, lineStyle: k < pl.tps ? 3 : 2, title: pl.objetivos.length > 1 ? `TP${k + 1}${k < pl.tps ? " ✓" : ""}` : "Objetivo" })));
+      if (pl.tps) lines.push(sC.createPriceLine({ price: pl.stopAct, color: css("--accent"), lineWidth: 1, lineStyle: 2, title: "Stop protegido" }));
       lines.push(sC.createPriceLine({ price: pl.entrada, color: css("--accent"), lineWidth: 1, lineStyle: 0, title: pl.activa ? "Entrada" : "Entrada posible" }));
       lines.push(sC.createPriceLine({ price: pl.stop, color: css("--down"), lineWidth: 1, lineStyle: 2, title: "Stop" }));
     } else { sTP.setData([]); sSL.setData([]); }
@@ -789,10 +794,10 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const lista = D.activas.concat((D.observando || []).map((s) => Object.assign({ _obs: true }, s)));
     $("act-note").textContent = lista.length ? "Observación = sin ventaja: solo se sigue en papel, sin aviso" : "";
     if (!lista.length) { $("activas").innerHTML = `<div class="panel empty" style="grid-column:1/-1"><b>No hay operaciones abiertas.</b><span>Cuando un setup se complete aparecerá aquí con su seguimiento. Si la estrategia tiene ventaja, además te llega el aviso por Telegram.</span></div>`; return; }
-    $("activas").innerHTML = lista.map((s) => { const p = precioDe(s.par), r = rAct(s, p); return `<button class="sig ${s.lado === 1 ? "" : "short"} ${s._obs ? "obs" : ""}" data-par="${esc(s.par)}" type="button">
+    $("activas").innerHTML = lista.map((s) => { const p = precioDe(s.par), r = s.tps ? s.r_actual : rAct(s, p); return `<button class="sig ${s.lado === 1 ? "" : "short"} ${s._obs ? "obs" : ""}" data-par="${esc(s.par)}" type="button">
       <div class="sig-top"><span class="pair">${esc(base(s.par))}</span>${ladoChip(s.lado)}${s._obs ? '<span class="chip neutral">OBSERVACIÓN</span>' : (s.real || {}).estado === "abierta" ? '<span class="chip accent">REAL</span>' : '<span class="chip neutral">PAPEL</span>'}<span class="when">${hace(s.creada)}</span></div>
       <div class="sig-strat">${esc(s.nombre)} · ${s.stats.n} ops, ${Math.round(s.stats.acierto * 100)}% acierto</div>
-      <div class="levels"><div><span class="label">Stop</span><span class="num down">${px(s.stop)}</span></div><div><span class="label">Entrada</span><span class="num">${px(s.entrada)}</span></div><div><span class="label">Objetivo</span><span class="num up">${px(s.objetivo)}</span></div></div>
+      <div class="levels"><div><span class="label">${s.tps ? "Stop protegido" : "Stop"}</span><span class="num ${s.tps ? "" : "down"}">${px(s.tps ? s.stop_actual : s.stop)}</span></div><div><span class="label">Entrada</span><span class="num">${px(s.entrada)}</span></div><div><span class="label">${(s.objetivos || []).length > 1 ? `TP ${s.tps || 0}/${s.objetivos.length} · siguiente` : "Objetivo"}</span><span class="num up">${px((s.objetivos || [s.objetivo])[Math.min(s.tps || 0, (s.objetivos || [s.objetivo]).length - 1)])}</span></div></div>${(s.contrarias || []).length ? '<div class="sig-strat" style="color:var(--down)">⚠️ Señal contraria detectada</div>' : ""}
       <div class="track"><div class="rail"></div><div class="tk"></div><div class="now" style="left:${pos(s, p)}%"></div></div>
       <div class="sig-foot"><span>Precio ${px(p)}</span><span class="r ${cls(r)}">${R(r)}</span></div></button>`; }).join("");
     $("activas").querySelectorAll(".sig").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par, true)));
@@ -802,7 +807,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   function pintarHistorial() {
     const h = D.historial, rd = D.rendimiento, ro = D.rendimiento_obs || {};
     if (!h.length) { $("p-hist").innerHTML = `<div class="empty"><b>Todavía no hay operaciones cerradas.</b><span>Cada setup completo se sigue en papel hasta que toca el objetivo, el stop o cumple ${D.config.velas_max} h. Aquí verás cuántas ganó y cuántas perdió, separando las señales con ventaja de las que están en observación.</span></div>`; return; }
-    const tx = { objetivo: ["Ganó · objetivo", "long"], stop: ["Perdió · stop", "short"], tiempo: ["Cerró por tiempo", "neutral"] };
+    const tx = { objetivo: ["Ganó · todos los TP", "long"], stop: ["Perdió · stop", "short"], tiempo: ["Cerró por tiempo", "neutral"], protegida: ["Ganó · TP1 y salida protegida", "long"] };
     const bloque = (t, x) => `<div class="stat"><span class="label">${t}</span><span class="num">${x.n || 0} cerradas · ${x.n ? Math.round(x.acierto * 100) : 0}% ganadas · <span class="${cls(x.total_r)}">${x.n ? R(x.total_r) + " (" + usd(x.total_r * D.config.riesgo_usd) + ")" : "–"}</span></span></div>`;
     $("p-hist").innerHTML = `<div class="sum-row">${bloque("Señales con ventaja", rd)}${bloque("En observación (sin ventaja)", ro)}</div>
       <div class="scroll-x"><table class="t"><thead><tr><th>Cierre</th><th>Par</th><th>Lado</th><th>Tipo</th><th>Estrategia</th><th class="r">Entrada</th><th class="r">Salida</th><th>Resultado</th><th class="r">R</th><th class="r">Con $${D.config.riesgo_usd}</th></tr></thead><tbody>${h.map((s) => `<tr><td class="num">${fecha(s.t_cierre)}</td><td><b>${esc(base(s.par))}</b></td><td>${ladoChip(s.lado)}</td><td>${s.observacion ? '<span class="chip neutral">Observación</span>' : '<span class="chip accent">Señal</span>'}</td><td>${esc(s.nombre)}</td><td class="num r">${px(s.entrada)}</td><td class="num r">${px(s.salida)}</td><td><span class="chip ${tx[s.estado][1]}">${tx[s.estado][0]}</span></td><td class="num r ${cls(s.r)}"><b>${R(s.r)}</b></td><td class="num r ${cls(s.r)}">${usd(s.r * D.config.riesgo_usd)}</td></tr>`).join("")}</tbody></table></div>`;
