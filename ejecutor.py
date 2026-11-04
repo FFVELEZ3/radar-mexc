@@ -34,7 +34,7 @@ def _exp(senales):
 
 def decidir_modo(senales, hay_cliente):
     """Devuelve (modo_efectivo, explicación, progreso)."""
-    cerradas = sorted((s for s in senales if s["estado"] != "activa"),
+    cerradas = sorted((s for s in senales if s["estado"] != "activa" and not s.get("observacion")),
                       key=lambda s: s.get("t_cierre", ""))
     n, exp_total = len(cerradas), _exp(cerradas)
     ultimas = cerradas[-C.VENTANA_PAUSA:]
