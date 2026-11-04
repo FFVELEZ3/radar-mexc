@@ -150,7 +150,39 @@
     sub.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (r && !sync) { sync = true; chart.timeScale().setVisibleLogicalRange(r); sync = false; } });
     capa = $("capa"); ctx = capa.getContext("2d");
     new ResizeObserver(() => requestAnimationFrame(dibujarCapa)).observe($("chart"));
+    // escala como TradingView: al arrastrar el eje se apaga "auto"; el botón (o doble clic) la vuelve a encender
+    const refrescar = () => setTimeout(() => { pintarEscala(); requestAnimationFrame(dibujarCapa); }, 30);
+    ["pointerup", "wheel", "touchend"].forEach((ev) => $("chart").addEventListener(ev, refrescar, { passive: true }));
+    $("chart").addEventListener("dblclick", () => accionEscala("ir"));
+    $("escala").addEventListener("click", (e) => { const b = e.target.closest("button"); if (b) accionEscala(b.dataset.a); });
+    document.addEventListener("keydown", (e) => { if (e.altKey && !e.ctrlKey && !e.metaKey && /^[rRlLaA]$/.test(e.key) && $("v-mercado").classList.contains("on")) { e.preventDefault(); accionEscala({ r: "ir", l: "log", a: "auto" }[e.key.toLowerCase()]); } });
+    aplicarEscala();
     return true;
+  }
+  const ESC = { modo: LS.get("escModo", 0) };
+  function aplicarEscala(auto = true) {
+    chart.priceScale("right").applyOptions({ mode: ESC.modo, autoScale: auto });
+    sub.priceScale("right").applyOptions({ autoScale: true });
+    LS.set("escModo", ESC.modo); pintarEscala(); requestAnimationFrame(dibujarCapa);
+  }
+  function verUltimas() {
+    const ver = TF[tf].src === "tr" ? 120 : ({ "1D": 180, "1S": 110, "1M": 80 })[tf] || 130;
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, serie.length - ver), to: serie.length + 12 });
+  }
+  function accionEscala(a) {
+    if (!chart || !a) return;
+    const auto = chart.priceScale("right").options().autoScale;
+    if (a === "ir") { verUltimas(); aplicarEscala(true); }
+    else if (a === "fit") { chart.timeScale().fitContent(); aplicarEscala(true); }
+    else if (a === "auto") aplicarEscala(!auto);
+    else if (a === "log") { ESC.modo = ESC.modo === 1 ? 0 : 1; aplicarEscala(true); }
+    else if (a === "pct") { ESC.modo = ESC.modo === 2 ? 0 : 2; aplicarEscala(true); }
+  }
+  function pintarEscala() {
+    if (!chart) return;
+    const auto = chart.priceScale("right").options().autoScale, e = $("escala");
+    e.innerHTML = `<button type="button" data-a="ir" title="Ir a la última vela y reajustar (doble clic en el gráfico · Alt+R)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h12M13 6l6 6-6 6"/><path d="M21 4v16"/></svg></button><button type="button" data-a="fit" title="Ver todo el historial cargado"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button><i></i><button type="button" data-a="pct" aria-pressed="${ESC.modo === 2}" title="Escala en porcentaje desde la primera vela visible">%</button><button type="button" data-a="log" aria-pressed="${ESC.modo === 1}" title="Escala logarítmica (Alt+L)">log</button><button type="button" data-a="auto" aria-pressed="${auto}" title="Escala automática: el precio se ajusta a las velas visibles (Alt+A)">auto</button>`;
+    e.style.right = (chart.priceScale("right").width() + 8) + "px";
   }
   function linea(color, w = 1.5, extra = {}) { const s = chart.addLineSeries({ color, lineWidth: w, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, ...extra }); extras.push(s); return s; }
   const L = (arr, desfase = 0) => { const out = []; for (let i = 0; i < arr.length; i++) { if (arr[i] == null) continue; const j = i + desfase; const t = j < serie.length ? serie[j][0] : serie[serie.length - 1][0] + (j - serie.length + 1) * TF[tf].seg; out.push({ time: t, value: arr[i] }); } return out; };
@@ -181,7 +213,7 @@
   }
   function marcas() {
     const tiempos = new Set(serie.map((x) => x[0])), seg = TF[tf].seg, m = [], p = parD(sel);
-    if (ON.hist && p && (tf === "1H" || tf === "4H")) { const letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S" }; p.marcas.forEach((x) => { const t = Math.floor(x.t / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: x.lado === 1 ? "belowBar" : "aboveBar", color: x.r > 0 ? css("--up") : css("--down"), shape: x.lado === 1 ? "arrowUp" : "arrowDown", text: letra[x.clave] || "" }); }); }
+    if (ON.hist && p && (tf === "1H" || tf === "4H")) { const letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S", mtf: "M", barrida: "L", compresion: "C" }; p.marcas.forEach((x) => { const t = Math.floor(x.t / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: x.lado === 1 ? "belowBar" : "aboveBar", color: x.r > 0 ? css("--up") : css("--down"), shape: x.lado === 1 ? "arrowUp" : "arrowDown", text: letra[x.clave] || "" }); }); }
     if (D) D.activas.filter((a) => a.par === sel).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / seg) * seg; if (tiempos.has(t)) m.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "SEÑAL" }); });
     (calc.div || []).forEach((d) => m.push({ time: d.t, position: d.tipo === "bajista" ? "aboveBar" : "belowBar", color: d.tipo === "bajista" ? css("--down") : css("--up"), shape: "square", text: "Div" }));
     sC.setMarkers(m.sort((a, b) => a.time - b.time));
@@ -418,8 +450,7 @@
     chart.timeScale().applyOptions({ secondsVisible: TF[tf].seg < 60, timeVisible: TF[tf].seg < 86400 });
     sC.setData(serie.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
     dibujarTodo();
-    const ver = TF[tf].src === "tr" ? 120 : ({ "1D": 180, "1S": 110, "1M": 80 })[tf] || 130;
-    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, serie.length - ver), to: serie.length + 12 });
+    verUltimas(); aplicarEscala(true);
     pintarCabecera(); pintarNiveles();
     $("nota").innerHTML = TF[tf].src === "tr" ? `Velas de ${tf} armadas con cada operación de MEXC desde que abriste el panel (${(trades[sel] || []).length} recibidas).` : `Velas de Binance Futures como referencia de precio (la diferencia con MEXC es mínima); se actualizan cada 3 s. ${parD(sel) ? "Las señales del radar se calculan en 1H con datos de MEXC." : "Activo fuera del radar: solo análisis técnico."}`;
     if (!$("l-tec").hidden) pintarTecnico();
