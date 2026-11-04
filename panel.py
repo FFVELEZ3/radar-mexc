@@ -53,11 +53,14 @@ def resumen_par(par, d, resultados_par, info):
     for r in resultados_par:
         lado, conds = condiciones_actuales(CONDICIONES[r["clave"]][1], d)
         stop, objetivo, riesgo = niveles(lado, float(u["close"]), float(u["atr"]))
+        modo = r["m"].get("gestion") or "escalonada"
+        objetivo = salidas.objetivos(lado or 1, float(u["close"]), riesgo, modo)[-1]
         estrategias.append({
             "plan": {"entrada": _sig(u["close"]), "stop": _sig(stop), "objetivo": _sig(objetivo),
-                     "objetivos": [_sig(x) for x in salidas.objetivos(lado or 1, float(u["close"]), riesgo)],
-                     "r_neto": [round(salidas.r_si_llega(lado or 1, float(u["close"]), stop, riesgo, k), 2)
-                                for k in range(len(salidas.tramos()))],
+                     "objetivos": [_sig(x) for x in salidas.objetivos(lado or 1, float(u["close"]), riesgo, modo)],
+                     "r_neto": [round(salidas.r_si_llega(lado or 1, float(u["close"]), stop, riesgo, k, modo), 2)
+                                for k in range(len(salidas.tramos(modo)))],
+                     "tramos": [[a, f] for a, f in salidas.tramos(modo)],
                      "apal_max": salidas.apalancamiento_max(riesgo / float(u["close"])),
                      "riesgo_pct": riesgo / float(u["close"])},
             "alternativa": r["m"].get("alternativa"), "gestion": r["m"].get("gestion"),
