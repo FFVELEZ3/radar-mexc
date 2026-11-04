@@ -217,7 +217,8 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     # 1. Seguimiento de señales abiertas
     precios = {p: v["precio"] for p, v in info.items()}
     for s in seguimiento.actualizar(senales, por_par, precios):
-        telegram.enviar(mensaje_cierre(s))
+        if not s.get("observacion"):
+            telegram.enviar(mensaje_cierre(s))
 
     # 2. Señales nuevas (solo combinaciones aprobadas y vela recién cerrada)
     cliente = crear_cliente()
@@ -226,8 +227,9 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     ids = {s["id"] for s in senales}
     abiertas = {(s["par"], s["clave"]) for s in senales if s["estado"] == "activa"}
     for r in resultados:
-        if r["ultima_senal"] == 0 or not r["m"]["aprobada"]:
+        if r["ultima_senal"] == 0:
             continue
+        observacion = not r["m"]["aprobada"]  # sin ventaja: se sigue en papel, sin aviso ni dinero
         if (r["par"], r["clave"]) in abiertas:
             continue  # igual que el backtest: una operación a la vez por par y estrategia
         if ahora - (r["vela"] + timedelta(hours=1)) > timedelta(minutes=90):
@@ -237,10 +239,12 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
             continue
         s["precio_actual"] = precios.get(r["par"], s["entrada"])
         s["r_actual"] = round(seguimiento.resultado_r(s, s["precio_actual"]), 3)
+        s["observacion"] = observacion
         senales.append(s)
         ids.add(s["id"])
-        nuevas.append(s)
-        telegram.enviar(mensaje_senal(s, r, modo_previo))
+        if not observacion:
+            nuevas.append(s)
+            telegram.enviar(mensaje_senal(s, r, modo_previo))
 
     # 3. Operación automática (papel o real, con frenos)
     bot = ejecutor.procesar(cliente, senales, nuevas, precios, ahora, telegram.enviar)
@@ -250,18 +254,19 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         estado["modo_bot"] = bot["modo"]
 
     # 4. Resumen diario
-    rend = seguimiento.rendimiento(senales)
+    rend = seguimiento.rendimiento([s for s in senales if not s.get("observacion")])
+    rend_obs = seguimiento.rendimiento([s for s in senales if s.get("observacion")])
     local = ahora.astimezone(TZ)
     if local.hour == C.HORA_RESUMEN and estado.get("resumen") != local.strftime("%Y-%m-%d"):
         if telegram.enviar(mensaje_resumen(resultados, rend, errores)):
             estado["resumen"] = local.strftime("%Y-%m-%d")
 
     # 5. Guardar estado y datos del panel
-    cerradas = [s for s in senales if s["estado"] != "activa"][-400:]
+    cerradas = [s for s in senales if s["estado"] != "activa"][-800:]
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 
