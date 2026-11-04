@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo
 import config as C
 import datos
 import ejecutor
+import grupos
 import panel
 from mexc_privado import ClienteMexc
 import salidas
@@ -350,6 +351,13 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         if not s.get("observacion") or s.get("candidata"):
             telegram.enviar(mensaje_cierre(s))
 
+    # 1b. Auditor de grupos: señales reenviadas al bot, seguidas con precios de MEXC
+    try:
+        auditoria = grupos.procesar(ahora, precios, telegram.enviar)
+    except Exception as err:  # nunca debe detener el radar
+        print(f"[grupos] error: {err}")
+        auditoria = None
+
     # 2. Señales nuevas (solo combinaciones aprobadas y vela recién cerrada)
     cliente = crear_cliente()
     modo_previo = ejecutor.decidir_modo(senales, cliente is not None)[0]
@@ -437,7 +445,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 
