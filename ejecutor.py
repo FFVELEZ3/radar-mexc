@@ -19,6 +19,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import config as C
+import salidas
 from mexc_privado import ErrorMexc
 
 TZ = ZoneInfo(C.ZONA_HORARIA)
@@ -120,17 +121,35 @@ def conciliar(cliente, senales, precios, ahora, avisar):
             real["position_id"] = pos.get("positionId")
             real["vol_abierto"] = float(pos.get("holdVol") or 0)
             real["liquidacion"] = float(pos.get("liquidatePrice") or 0)
-            # Cierre por tiempo: el seguimiento en papel ya la cerró a las 48 h
-            if s["estado"] == "tiempo" and not real.get("cierre_enviado"):
+            precio_ahora = precios.get(s["par"], s["entrada"])
+            # Cierres parciales: el seguimiento en papel marcó TP1 / TP2 (TP3 lo cierra MEXC)
+            reparto = [f for _, f in salidas.tramos(s.get("gestion", "fija"))]
+            hechos = real.get("tps", 0)
+            while hechos < min(s.get("tps", 0), len(reparto) - 1):
+                parte = math.floor(real.get("vol", 0) * reparto[hechos] / real.get("unidad", 1)) * real.get("unidad", 1)
+                parte = min(parte, real["vol_abierto"])
+                if parte > 0:
+                    try:
+                        cliente.cerrar(s["par"], s["lado"], parte, precio_ahora, real["position_id"],
+                                       _oid(f"{s['id']}|tp{hechos + 1}"))
+                        real["vol_abierto"] -= parte
+                        avisar(f"🎯 <b>Real</b> {s['par']}: TP{hechos + 1} — cerré {parte:g} contratos.")
+                    except ErrorMexc as e:
+                        avisar(f"⚠️ No pude cerrar la parte de TP{hechos + 1} en {s['par']}: {e}.")
+                        break
+                hechos += 1
+                real["tps"] = hechos
+            # Cierre total: por tiempo, o porque tras TP1 el precio volvió a la entrada
+            if s["estado"] in ("tiempo", "protegida") and not real.get("cierre_enviado") and real["vol_abierto"] > 0:
+                motivo = (f"por tiempo ({int(C.VELAS_MAXIMAS)} h sin tocar stop ni objetivo)"
+                          if s["estado"] == "tiempo" else "en la entrada (protección tras TP1)")
                 try:
-                    cliente.cerrar(s["par"], s["lado"], real["vol_abierto"],
-                                   precios.get(s["par"], s["entrada"]), real["position_id"],
-                                   _oid(s["id"] + "|cierre"))
+                    cliente.cerrar(s["par"], s["lado"], real["vol_abierto"], precio_ahora,
+                                   real["position_id"], _oid(s["id"] + "|cierre"))
                     real["cierre_enviado"] = ahora.isoformat()
-                    avisar(f"⏱ Cerrando {s['par']} por tiempo ({int(C.VELAS_MAXIMAS)} h sin tocar "
-                           "stop ni objetivo).")
+                    avisar(f"🔒 Cerrando {s['par']} {motivo}.")
                 except ErrorMexc as e:
-                    avisar(f"⚠️ No pude cerrar {s['par']} por tiempo: {e}. Ciérrala en la app de MEXC.")
+                    avisar(f"⚠️ No pude cerrar {s['par']} {motivo}: {e}. Ciérrala en la app de MEXC.")
             continue
         # Ya no está abierta en MEXC: buscar el resultado
         pnl = None
@@ -212,7 +231,7 @@ def abrir_senal(cliente, s, senales, precios, ahora, avisar):
         except ErrorMexc:
             pass
         s["real"] = {"estado": "abierta", "oid": oid, "position_id": position_id,
-                     "vol": vol, "precio_entrada": ejecutada,
+                     "vol": vol, "unidad": det["unidad"], "tps": 0, "precio_entrada": ejecutada,
                      "stop": stop, "objetivo": objetivo, "apalancamiento": apal,
                      "nocional": round(nocional, 2), "margen": round(margen, 2),
                      "riesgo_usd": round(vol * perdida_por_contrato, 4), "t": ahora.isoformat()}
