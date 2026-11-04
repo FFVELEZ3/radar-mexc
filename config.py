@@ -57,7 +57,7 @@ MIN_T = _num("MIN_T", 2.0)
 FRACCION_EN_MUESTRA = 0.70  # 70 % del historial para evaluar, 30 % para confirmar
 
 # --- Panel ---
-INTERVALO_MIN = 15  # cada cuánto corre el análisis (debe coincidir con el workflow)
+INTERVALO_MIN = _num("INTERVALO_MIN", 5)  # minutos entre análisis (modo continuo)
 DIR_DATOS = os.getenv("DIR_DATOS", "docs/data")
 
 # --- Avisos ---
