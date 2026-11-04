@@ -132,10 +132,10 @@ table.t .r { text-align: right; } table.t tr:last-child td { border-bottom: 0; }
 .inf .isel button { background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; font-size: 11px; padding: 1px 7px; cursor: pointer; color: var(--muted); }
 .inf .isel button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); }
 .nota { padding: 8px 12px 12px; font-size: 12.5px; color: var(--muted); }
-.lado { display: grid; gap: 12px; }
-.lado .panel { padding: 0; }
+.lado { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.lado .panel { padding: 0; min-width: 0; overflow: hidden; }
 .lado .sub { margin: 0; padding: 0 6px; }
-.lado .cuerpo { padding: 14px; display: grid; gap: 14px; }
+.lado .cuerpo { padding: 14px; display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
 .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; } .kv > div { display: grid; gap: 1px; } .kv .num { font-size: 14px; }
 .barra { height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; display: flex; } .barra i { display: block; height: 100%; }
 .veredicto { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
