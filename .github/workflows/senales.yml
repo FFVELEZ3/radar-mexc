@@ -17,7 +17,8 @@ permissions:
   actions: write
 
 concurrency:
-  group: radar
+  # prueba y backtest corren aparte para no esperar al análisis continuo
+  group: ${{ (github.event.inputs.modo == 'prueba' || github.event.inputs.modo == 'backtest') && format('radar-{0}', github.run_id) || 'radar' }}
   cancel-in-progress: false
 
 jobs:
