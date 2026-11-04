@@ -60,6 +60,11 @@ MIN_FACTOR_BENEFICIO = _num("MIN_FACTOR_BENEFICIO", 1.15)
 # Estadístico t de la expectativa: con 2.0, solo ~0.6 % de estrategias sobre
 # precios aleatorios pasan el filtro (medido con 180 simulaciones).
 MIN_T = _num("MIN_T", 2.0)
+# Nivel "candidata": una estrategia que no pasa par por par (pocas operaciones por par) pero
+# gana sumando todos los pares con t >= 3, y es positiva en la parte antigua y en la reciente.
+# Sus señales se avisan por Telegram marcadas como "en validación" y se siguen en papel.
+MIN_T_CONJUNTO_CANDIDATA = _num("MIN_T_CONJUNTO_CANDIDATA", 3.0)
+MIN_OPS_CONJUNTO_CANDIDATA = _num("MIN_OPS_CONJUNTO_CANDIDATA", 200)
 FRACCION_EN_MUESTRA = 0.70  # 70 % del historial para evaluar, 30 % para confirmar
 
 # --- Panel ---

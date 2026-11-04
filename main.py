@@ -119,7 +119,20 @@ def filtro_conjunto(resultados):
     HORARIOS = {k: por_horario(pd.concat(v)) for k, v in por_clave.items()}
     if por_clave:
         HORARIOS["todas"] = por_horario(pd.concat([o for v in por_clave.values() for o in v]))
+    # candidatas: ventaja en el conjunto, repetida en el periodo antiguo y en el reciente
+    candidatas = set()
+    for k, v in por_clave.items():
+        ops = pd.concat(v)
+        t = pd.DatetimeIndex(ops["entrada_t"])
+        corte = t.min() + (t.max() - t.min()) * C.FRACCION_EN_MUESTRA
+        mi, mo, mt = metricas(ops[t < corte]), metricas(ops[t >= corte]), conjunto[k]
+        if (mt["n"] >= C.MIN_OPS_CONJUNTO_CANDIDATA and mt["exp_r"] > 0 and mt["t"] >= C.MIN_T_CONJUNTO_CANDIDATA
+                and mi["exp_r"] > 0 and mo["exp_r"] > 0):
+            candidatas.add(k)
     for r in resultados:
+        # en el par concreto tampoco debe perder (aunque tenga pocas operaciones para probarlo)
+        r["m"]["candidata"] = (not r["m"]["aprobada"] and r["clave"] in candidatas
+                               and r["m"]["total"]["n"] >= 10 and r["m"]["total"]["exp_r"] > 0)
         c = conjunto.get(r["clave"])
         r["m"]["conjunto"] = {k: c[k] for k in ("n", "exp_r", "t")} if c else None
         if r["m"]["aprobada"] and (not c or c["exp_r"] <= 0 or c["t"] < 1.0):
@@ -228,7 +241,35 @@ def mensaje_observacion(s, r):
             + " · ".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs)))
 
 
-def mensaje_resumen(resultados, rend, errores):
+def mensaje_candidata(s, r):
+    t, c = r["m"]["total"], r["m"].get("conjunto") or {}
+    objs = s.get("objetivos") or [s["objetivo"]]
+    lado = "🟢 LONG" if s["lado"] == 1 else "🔴 SHORT"
+    return (f"🟡 <b>SEÑAL CANDIDATA</b> (en validación) · {s['par']} {lado}\n"
+            f"{s['nombre']}\n\n"
+            f"Entrada ≈ {precio(s['entrada'])}\nStop {precio(s['stop'])}\n"
+            + "\n".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs)) + "\n\n"
+            f"Por qué: en el año ganó {c.get('exp_r', 0):+.2f}R por operación sumando todos los pares "
+            f"({c.get('n', 0)} ops, t={c.get('t', 0):.1f}), en la parte antigua y en la reciente. "
+            f"En este par: {t['n']} ops, {t['exp_r']:+.2f}R (pocas para probarlo solo).\n"
+            "⚠️ Aún no está confirmada con datos nuevos: si la tomas, usa el riesgo mínimo. "
+            "El radar la sigue en papel y te avisa cuando cierre.")
+
+
+def resumen_observacion(senales, ahora):
+    """Lo que el radar vio en las últimas 24 h aunque no lo avisara."""
+    desde = (ahora - timedelta(hours=24)).isoformat()
+    obs = [s for s in senales if s.get("observacion") and s.get("t_entrada", "") >= desde]
+    cerr = [s for s in obs if s["estado"] != "activa"]
+    por = {}
+    for s in cerr:
+        por.setdefault(s["nombre"], []).append(s.get("r") or 0)
+    return {"detectados": len(obs), "cerrados": len(cerr), "total_r": round(sum(s.get("r") or 0 for s in cerr), 2),
+            "candidatas": sum(1 for s in obs if s.get("candidata")),
+            "por": sorted(((k, len(v), round(sum(v), 2)) for k, v in por.items()), key=lambda x: -x[2])}
+
+
+def mensaje_resumen(resultados, rend, errores, obs=None):
     aprobadas = sorted((r for r in resultados if r["m"]["aprobada"]),
                        key=lambda r: r["m"]["total"]["exp_r"], reverse=True)
     lineas = [f"📊 <b>Resumen diario</b> · {len(resultados)} combinaciones evaluadas"]
@@ -241,7 +282,17 @@ def mensaje_resumen(resultados, rend, errores):
             t = r["m"]["total"]
             lineas.append(f"• {r['par']} · {r['nombre']}: {t['exp_r']:+.2f}R, t={t['t']:.1f}")
     else:
-        lineas.append("Ninguna combinación pasa hoy el filtro: no habrá señales.")
+        lineas.append("Ninguna combinación pasa hoy el filtro completo.")
+    cands = sorted({r["nombre"] for r in resultados if r["m"].get("candidata")})
+    if cands:
+        lineas.append("🟡 Candidatas en validación (te llegan marcadas): " + ", ".join(cands))
+    if obs and obs["detectados"]:
+        lineas.append(f"\n👀 <b>Lo que el radar vio en 24 h</b>: {obs['detectados']} setups, {obs['cerrados']} ya cerrados "
+                      f"en papel con {obs['total_r']:+.2f}R en total.")
+        for nombre, n, tr in obs["por"]:
+            lineas.append(f"• {nombre}: {n} cerrados, {tr:+.2f}R")
+        if obs["total_r"] < 0:
+            lineas.append("No avisarlos te evitó esa pérdida: así se ve por qué el radar filtra.")
     if errores:
         lineas.append(f"Pares con error de datos: {len(errores)}")
     if url_panel():
@@ -293,10 +344,10 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     precios = {p: v["precio"] for p, v in info.items()}
     cerradas_ahora, eventos = seguimiento.actualizar(senales, por_par, precios)
     for s, k in eventos:
-        if not s.get("observacion") and s["id"] not in {c["id"] for c in cerradas_ahora}:
+        if (not s.get("observacion") or s.get("candidata")) and s["id"] not in {c["id"] for c in cerradas_ahora}:
             telegram.enviar(mensaje_tp(s, k))
     for s in cerradas_ahora:
-        if not s.get("observacion"):
+        if not s.get("observacion") or s.get("candidata"):
             telegram.enviar(mensaje_cierre(s))
 
     # 2. Señales nuevas (solo combinaciones aprobadas y vela recién cerrada)
@@ -328,11 +379,14 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         s["precio_actual"] = precios.get(r["par"], s["entrada"])
         s["r_actual"] = round(seguimiento.resultado_r(s, s["precio_actual"]), 3)
         s["observacion"] = observacion
+        s["candidata"] = bool(observacion and r["m"].get("candidata"))
         senales.append(s)
         ids.add(s["id"])
         if not observacion:
             nuevas.append(s)
             telegram.enviar(mensaje_senal(s, r, modo_previo))
+        elif s["candidata"]:
+            telegram.enviar(mensaje_candidata(s, r))
         elif C.AVISAR_OBSERVACION:
             telegram.enviar(mensaje_observacion(s, r))
 
@@ -375,7 +429,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     rend_obs = seguimiento.rendimiento([s for s in senales if s.get("observacion")])
     local = ahora.astimezone(TZ)
     if local.hour == C.HORA_RESUMEN and estado.get("resumen") != local.strftime("%Y-%m-%d"):
-        if telegram.enviar(mensaje_resumen(resultados, rend, errores)):
+        if telegram.enviar(mensaje_resumen(resultados, rend, errores, resumen_observacion(senales, ahora))):
             estado["resumen"] = local.strftime("%Y-%m-%d")
 
     # 5. Guardar estado y datos del panel
