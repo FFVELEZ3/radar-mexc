@@ -296,7 +296,7 @@
   }
 
   // ---------- resumen técnico multi-temporalidad ----------
-  const MTF = ["5m", "15m", "1H", "4H", "1D", "1S"];
+  const MTF = ["5m", "15m", "1H", "4H", "1D", "1S"];  // la tabla; el bloque "de arriba abajo" usa D, 4h, 1h y 15m
   const cls2 = (tx) => ({ "Compra fuerte": "cf", "Compra": "c", "Venta fuerte": "vf", "Venta": "v" })[tx] || "n";
   async function pintarTecnico() {
     const el = $("l-tec"), s = sel; el.innerHTML = '<span class="muted">Calculando en 6 temporalidades…</span>';
@@ -304,10 +304,40 @@
     if (s !== sel) return;
     const val = filas.filter((f) => f.l), conf = val.reduce((a, f) => a + f.l.total, 0) / (val.length || 1), txc = conf >= .5 ? "Compra fuerte" : conf >= .15 ? "Compra" : conf <= -.5 ? "Venta fuerte" : conf <= -.15 ? "Venta" : "Neutral";
     const act = filas.find((f) => f.t === tf) || filas.find((f) => f.l) || {};
-    el.innerHTML = `<div><div class="label">Confluencia de 6 temporalidades</div><div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0"><span class="lect ${cls2(txc)}" style="font-size:18px">${txc}</span><span class="num muted">${(conf * 100).toFixed(0)} / 100</span></div><div class="medidor"><b style="left:${(conf + 1) / 2 * 100}%"></b></div></div>
+    const aa = await arribaAbajo(s); if (s !== sel) return;
+    el.innerHTML = aa + `<div><div class="label">Confluencia de 6 temporalidades</div><div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0"><span class="lect ${cls2(txc)}" style="font-size:18px">${txc}</span><span class="num muted">${(conf * 100).toFixed(0)} / 100</span></div><div class="medidor"><b style="left:${(conf + 1) / 2 * 100}%"></b></div></div>
       <table class="mtf"><thead><tr><th>Temp.</th><th>Lectura</th><th class="r">▲ / ▼</th><th class="r">RSI</th><th class="r">Cierra en</th></tr></thead><tbody>${filas.map((f) => `<tr><td><b>${f.t}</b></td><td>${f.l ? `<span class="lect ${cls2(f.l.tx)}">${f.l.tx}</span>` : '<span class="muted">sin datos</span>'}</td><td class="r num">${f.l ? `<span class="up">${f.l.compras}</span>/<span class="down">${f.l.ventas}</span>` : "–"}</td><td class="r num">${f.l && f.l.rsi ? f.l.rsi.toFixed(0) : "–"}</td><td class="r num" data-cierre="${f.t}">${falta(proximoCierre(f.t) - Date.now() / 1000)}</td></tr>`).join("")}</tbody></table>
       ${act.l ? `<div><div class="label" style="margin-bottom:6px">Detalle en ${act.t}</div><div class="votos">${act.l.votos.map((x) => `<div><span>${x.nombre}</span><span class="${x.x > 0 ? "up" : x.x < 0 ? "down" : "muted"}">${x.x > 0 ? "▲ compra" : x.x < 0 ? "▼ venta" : "◆ neutral"}${x.det != null && isFinite(x.det) ? ` <span class="muted num">${x.det > 1000 || x.det < 1 ? px(x.det) : x.det.toFixed(1)}</span>` : ""}</span></div>`).join("")}</div></div>` : ""}
       <div class="aviso">Es una <b>lectura técnica</b> (10 indicadores votan) como la de los analistas, no una señal: el backtest del radar muestra que estas lecturas solas no ganan tras comisiones. Úsala para no operar contra la tendencia mayor.</div>`;
+  }
+
+  // análisis de arriba abajo: diario y 4h dan la dirección, 1h el contexto y 15m la entrada fina
+  function dirTF(v) {
+    if (!v || v.length < 60) return null;
+    const c = v.map((x) => x[4]), n = c.length - 1, e20 = IND.ema(c, 20)[n], e50 = IND.ema(c, 50)[n], u = c[n];
+    return u > e50 && e20 > e50 ? 1 : u < e50 && e20 < e50 ? -1 : 0;
+  }
+  async function arribaAbajo(s) {
+    const [vD, v4, v1, v15] = await Promise.all(["1D", "4H", "1H", "15m"].map((t) => obtener(s, t)));
+    const d = [["Diario", dirTF(vD)], ["4h", dirTF(v4)], ["1h", dirTF(v1)], ["15m", dirTF(v15)]];
+    const ico = (x) => x === 1 ? '<span class="up">▲ alcista</span>' : x === -1 ? '<span class="down">▼ bajista</span>' : '<span class="muted">◆ lateral</span>';
+    const sesgo = d[0][1] && d[0][1] === d[1][1] ? d[0][1] : 0;
+    let plan = "";
+    if (!sesgo) plan = `<div class="aviso">El diario y el 4h <b>no apuntan al mismo lado</b>: no hay sesgo claro. Lo profesional aquí es esperar.</div>`;
+    else if (v15 && v15.length > 60 && v1 && v1.length > 60) {
+      const z15 = IND.zonas(v15), z1 = IND.zonas(v1), u = v15[v15.length - 1][4], a15 = IND.atr(v15).slice(-1)[0];
+      const zona = sesgo === 1 ? z15.sop[0] : z15.res[0], meta = sesgo === 1 ? z1.res[0] : z1.sop[0];
+      const alineado = d[2][1] === sesgo;
+      if (zona) {
+        const entrada = sesgo === 1 ? zona.hi : zona.lo, stop = sesgo === 1 ? zona.lo - 0.5 * a15 : zona.hi + 0.5 * a15;
+        const obj = meta ? meta.precio : entrada + sesgo * 2 * Math.abs(entrada - stop), rr = Math.abs(obj - entrada) / Math.abs(entrada - stop);
+        plan = `<div class="aviso"><b>Sesgo ${sesgo === 1 ? "LONG" : "SHORT"}</b> (diario y 4h de acuerdo)${alineado ? " y el 1h acompaña." : ", pero el 1h todavía va en contra: espera a que gire."}<br>
+          Zona de entrada en 15m: <b class="num">${px(zona.lo)} – ${px(zona.hi)}</b> (${zona.toques} toques, ${pc((entrada - u) / u)} del precio)<br>
+          Invalidación: <b class="num">${px(stop)}</b> · objetivo ${meta ? "en la " + (sesgo === 1 ? "resistencia" : "zona de soporte") + " de 1h" : "a 2R"}: <b class="num">${px(obj)}</b> · R:R ${rr.toFixed(1)}<br>
+          <span class="muted">Plan táctico sin backtest: úsalo para afinar la entrada de una señal del radar, no como señal por sí solo.${rr < 1.5 ? " Con este R:R no compensa." : ""}</span></div>`;
+      } else plan = `<div class="aviso"><b>Sesgo ${sesgo === 1 ? "LONG" : "SHORT"}</b>, pero no hay una zona clara en 15m a favor: espera un retroceso.</div>`;
+    }
+    return `<div><div class="label" style="margin-bottom:6px">De arriba abajo</div><div class="votos">${d.map(([n, x]) => `<div><span>${n}</span>${x == null ? '<span class="muted">sin datos</span>' : ico(x)}</div>`).join("")}</div></div>${plan}`;
   }
 
   // ---------- niveles ----------
