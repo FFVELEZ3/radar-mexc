@@ -29,7 +29,9 @@ DESLIZAMIENTO = _num("DESLIZAMIENTO", 0.0003)     # 0.03 % por lado, prudente
 
 # --- Gestión de la operación ---
 ATR_STOP = _num("ATR_STOP", 1.5)          # stop = 1.5 x ATR(14)
-RATIO_BENEFICIO = _num("RATIO_BENEFICIO", 2.0)  # take profit = 2 x distancia del stop
+RATIO_BENEFICIO = _num("RATIO_BENEFICIO", 2.0)  # take profit = 2 x distancia del stop (modo "fija")
+# "escalonada": TP1 1R (50 %) → stop a la entrada, TP2 2R (30 %), TP3 3R (20 %) · "fija": un objetivo
+GESTION = os.getenv("GESTION", "escalonada").strip().lower() or "escalonada"
 VELAS_MAXIMAS = _num("VELAS_MAXIMAS", 48)  # cierre por tiempo: 48 velas de 1h
 
 # --- Tamaño de posición ---
