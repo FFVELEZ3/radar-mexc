@@ -60,7 +60,9 @@ def tickers():
 NO_CRIPTO = {"XAU", "XAG", "GOLD", "SILVER", "PAXG", "XAUT", "COPPER", "OIL", "WTI", "BRENT",
              "NATGAS", "SOXL", "TQQQ", "SQQQ", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "MSFT",
              "AMZN", "GOOGL", "META", "COIN", "MSTR", "HOOD", "CRCL", "USOIL", "UKOIL",
-             "KORU", "EWY", "EWJ", "FXI", "GLD", "SLV", "USO", "UVXY", "TLT"}
+             "KORU", "EWY", "EWJ", "FXI", "GLD", "SLV", "USO", "UVXY", "TLT",
+             "TESLA", "NVIDIA", "APPLE", "GOOGLE", "AMAZON", "MICROSOFT", "NETFLIX", "AMD",
+             "INTEL", "PLTR", "BABA", "ORCL", "AVGO", "SPX500", "NAS100", "US30", "DXY"}
 
 
 def es_cripto(simbolo):
