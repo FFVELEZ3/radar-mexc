@@ -58,7 +58,7 @@ def tickers():
 # MEXC también lista futuros de acciones, ETF y metales. No son cripto, operan con
 # horarios y noticias distintos, y muchos tienen poco historial: se excluyen.
 NO_CRIPTO = {"XAU", "XAG", "GOLD", "SILVER", "PAXG", "XAUT", "COPPER", "OIL", "WTI", "BRENT",
-             "NATGAS", "SOXL", "TQQQ", "SQQQ", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "MSFT",
+             "NATGAS", "SOXL", "SOXS", "SNXX", "TQQQ", "SQQQ", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "MSFT",
              "AMZN", "GOOGL", "META", "COIN", "MSTR", "HOOD", "CRCL", "USOIL", "UKOIL",
              "KORU", "EWY", "EWJ", "FXI", "GLD", "SLV", "USO", "UVXY", "TLT",
              "TESLA", "NVIDIA", "APPLE", "GOOGLE", "AMAZON", "MICROSOFT", "NETFLIX", "AMD",
