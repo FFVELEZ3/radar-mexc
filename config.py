@@ -17,7 +17,7 @@ def _num(nombre, defecto):
 
 
 # --- Mercado ---
-NUM_PARES = _num("NUM_PARES", 10)              # pares de mayor volumen a vigilar
+NUM_PARES = _num("NUM_PARES", 20)              # pares de mayor volumen a vigilar
 DIAS_HISTORIA = _num("DIAS_HISTORIA", 365)     # historial para el backtest
 EXCLUIR = [s.strip().upper() for s in os.getenv("EXCLUIR", "USDC_USDT").split(",") if s.strip()]
 
@@ -31,7 +31,8 @@ DESLIZAMIENTO = _num("DESLIZAMIENTO", 0.0003)     # 0.03 % por lado, prudente
 ATR_STOP = _num("ATR_STOP", 1.5)          # stop = 1.5 x ATR(14)
 RATIO_BENEFICIO = _num("RATIO_BENEFICIO", 2.0)  # take profit = 2 x distancia del stop (modo "fija")
 # "escalonada": TP1 1R (50 %) → stop a la entrada, TP2 2R (30 %), TP3 3R (20 %) · "fija": un objetivo
-GESTION = os.getenv("GESTION", "escalonada").strip().lower() or "escalonada"
+# "auto": cada estrategia usa la que mejor funcionó en el 70 % antiguo del historial
+GESTION = os.getenv("GESTION", "auto").strip().lower() or "auto"
 VELAS_MAXIMAS = _num("VELAS_MAXIMAS", 48)  # cierre por tiempo: 48 velas de 1h
 
 # --- Tamaño de posición ---
