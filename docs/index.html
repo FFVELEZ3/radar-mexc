@@ -24,7 +24,7 @@
   --fg: #e0e8f0; --muted: #8392a3; --faint: #4a5a6a;
   --accent: #e9b44c; --accent-soft: rgba(233,180,76,.14);
   --up: #2fc08b; --up-soft: rgba(47,192,139,.2); --down: #f05a6b; --down-soft: rgba(240,90,107,.2);
-  --ema50: #6c9bd2; --vol: rgba(131,146,163,.28);
+  --ema50: #6c9bd2; --ema200: #c084fc; --bb: #7dd3c0; --vwap: #f59e0b; --vol: rgba(131,146,163,.28);
   --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
   --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
@@ -37,7 +37,7 @@
     --fg: #111a23; --muted: #596777; --faint: #a3afbb;
     --accent: #b27a0e; --accent-soft: rgba(178,122,14,.12);
     --up: #0d9a66; --up-soft: rgba(13,154,102,.13); --down: #d23649; --down-soft: rgba(210,54,73,.12);
-    --ema50: #3c6fb0; --vol: rgba(89,103,119,.22);
+    --ema50: #3c6fb0; --ema200: #8b3fd1; --bb: #138a78; --vwap: #c2410c; --vol: rgba(89,103,119,.22);
     color-scheme: light;
   }
 }
@@ -46,7 +46,7 @@
   --fg: #111a23; --muted: #596777; --faint: #a3afbb;
   --accent: #b27a0e; --accent-soft: rgba(178,122,14,.12);
   --up: #0d9a66; --up-soft: rgba(13,154,102,.13); --down: #d23649; --down-soft: rgba(210,54,73,.12);
-  --ema50: #3c6fb0; --vol: rgba(89,103,119,.22);
+  --ema50: #3c6fb0; --ema200: #8b3fd1; --bb: #138a78; --vwap: #c2410c; --vol: rgba(89,103,119,.22);
   color-scheme: light;
 }
 html.standalone { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -122,6 +122,25 @@ h2 { margin: 0; font: 700 15px/1.2 var(--f-display); font-stretch: 112%; text-tr
 .legend { position: absolute; left: 12px; top: 8px; z-index: 2; display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); pointer-events: none; }
 .legend i { display: inline-block; width: 12px; height: 2px; vertical-align: middle; margin-right: 4px; }
 .legend .z { width: 10px; height: 10px; border-radius: 2px; }
+.seg .sep { width: 1px; background: var(--line); }
+.subsel { position: absolute; right: 70px; top: 6px; z-index: 3; display: flex; gap: 4px; }
+.subsel button { background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; font-size: 11px; padding: 2px 8px; color: var(--muted); cursor: pointer; }
+.subsel button[aria-pressed="true"] { color: var(--fg); border-color: var(--faint); }
+.flow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); border-top: 1px solid var(--line); }
+@media (max-width: 760px) { .flow { grid-template-columns: minmax(0, 1fr); } }
+.flow > div { padding: 12px 16px; min-width: 0; }
+.flow > div + div { border-left: 1px solid var(--line); }
+@media (max-width: 760px) { .flow > div + div { border-left: 0; border-top: 1px solid var(--line); } }
+.press { display: flex; height: 10px; border-radius: 5px; overflow: hidden; margin-top: 8px; background: var(--surface-2); }
+.press i:first-child { background: var(--up); transition: width .4s; } .press i:last-child { background: var(--down); transition: width .4s; }
+.press-n { display: flex; justify-content: space-between; font-size: 12px; margin-top: 4px; }
+.srlist { display: grid; gap: 4px; margin-top: 8px; }
+.srrow { display: grid; grid-template-columns: 58px 1fr auto auto; gap: 10px; align-items: center; font-size: 12.5px; }
+.srrow.now { padding-block: 2px; border-block: 1px dashed var(--line); }
+.tape { height: 230px; overflow-y: auto; margin-top: 8px; display: grid; align-content: start; gap: 1px; font-size: 12px; }
+.trow { display: grid; grid-template-columns: 96px 1fr 1fr 56px; gap: 8px; padding: 2px 6px; border-radius: 4px; }
+.trow.b span:nth-child(2), .trow.b span:last-child { color: var(--up); } .trow.s span:nth-child(2), .trow.s span:last-child { color: var(--down); }
+.trow.big.b { background: var(--up-soft); } .trow.big.s { background: var(--down-soft); }
 .c-note { padding: 8px 16px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); }
 
 /* Ficha de operación posible */
@@ -242,17 +261,25 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     <div class="panel chart-card">
       <div class="c-head" id="c-head"></div>
       <div class="c-tools">
-        <div class="seg" role="group" aria-label="Temporalidad"><button type="button" data-tf="1" aria-pressed="true">1H</button><button type="button" data-tf="4" aria-pressed="false">4H</button></div>
+        <div class="seg" role="group" aria-label="Temporalidad"><button type="button" data-tf="1s" aria-pressed="false">1s</button><button type="button" data-tf="5s" aria-pressed="false">5s</button><button type="button" data-tf="15s" aria-pressed="false">15s</button><span class="sep"></span><button type="button" data-tf="1m" aria-pressed="false">1m</button><button type="button" data-tf="5m" aria-pressed="false">5m</button><button type="button" data-tf="15m" aria-pressed="false">15m</button><span class="sep"></span><button type="button" data-tf="1H" aria-pressed="true">1H</button><button type="button" data-tf="4H" aria-pressed="false">4H</button></div>
         <div class="toggles">
           <button class="tg" type="button" data-t="niveles" aria-pressed="true">Operación posible</button>
-          <button class="tg" type="button" data-t="ema" aria-pressed="true">EMA 20/50</button>
+          <button class="tg" type="button" data-t="sr" aria-pressed="true">Soportes y resistencias</button>
+          <button class="tg" type="button" data-t="ema" aria-pressed="true">EMA 20/50/200</button>
+          <button class="tg" type="button" data-t="bb" aria-pressed="false">Bollinger</button>
+          <button class="tg" type="button" data-t="vwap" aria-pressed="false">VWAP</button>
           <button class="tg" type="button" data-t="vol" aria-pressed="true">Volumen</button>
           <button class="tg" type="button" data-t="hist" aria-pressed="true">Entradas históricas</button>
         </div>
       </div>
       <div class="chart-main"><div class="legend" id="legend"></div><div id="chart" style="position:absolute;inset:0"></div></div>
-      <div class="chart-rsi"><div class="legend"><span>RSI 14 · zonas 30 / 70</span></div><div id="rsi" style="position:absolute;inset:0"></div></div>
+      <div class="chart-rsi"><div class="legend"><span id="sublegend">RSI 14 · zonas 30 / 70</span></div><div class="subsel" role="group" aria-label="Indicador inferior"><button type="button" data-inf="rsi" aria-pressed="true">RSI</button><button type="button" data-inf="macd" aria-pressed="false">MACD</button></div><div id="rsi" style="position:absolute;inset:0"></div></div>
       <div class="c-note" id="c-note"></div>
+      <div class="flow">
+        <div><div class="label">Presión compradora vs vendedora · últimos 60 s</div><div class="press"><i id="pb" style="width:50%"></i><i id="ps" style="width:50%"></i></div><div class="press-n"><span class="up" id="pbt"></span><span class="muted" id="ptps"></span><span class="down" id="pst"></span></div>
+          <div class="label" style="margin-top:14px">Niveles clave de esta temporalidad</div><div class="srlist" id="srlist"></div></div>
+        <div><div class="label">Operaciones en MEXC en tiempo real · resaltadas las más grandes</div><div class="tape" id="tape"><span class="muted">Conectando…</span></div></div>
+      </div>
     </div>
     <aside class="panel plan" id="plan" aria-label="Operación posible"></aside>
   </section>
@@ -299,11 +326,19 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
 (() => {
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  let D = null, sel = null, vivo = {}, wsOk = false, tf = 1;
-  const estSel = {};               // estrategia elegida por par
-  const vis = { niveles: true, ema: true, vol: true, hist: true };
+  let D = null, sel = null, vivo = {}, wsOk = false, tf = "1H", inferior = "rsi";
+  const estSel = {};
+  const vis = { niveles: true, sr: true, ema: true, bb: false, vwap: false, vol: true, hist: true };
   let zona = "America/Guayaquil";
-  let chart, sC, sE20, sE50, sVol, sTP, sSL, rsiChart, sRsi, lines = [], eqChart, eqS, sync = false;
+  let chart, sC, sE20, sE50, sE200, sBBu, sBBl, sVwap, sVol, sTP, sSL, sub, sRsi, sMacd, sSig, sHist, lines = [], eqChart, eqS, sync = false;
+  // Temporalidades: de dónde salen las velas
+  const TF = {
+    "1s": { seg: 1, src: "mx_trades" }, "5s": { seg: 5, src: "mx_trades" }, "15s": { seg: 15, src: "mx_trades" },
+    "1m": { seg: 60, src: "bn", bn: "1m" }, "5m": { seg: 300, src: "bn", bn: "5m" }, "15m": { seg: 900, src: "bn", bn: "15m" },
+    "1H": { seg: 3600, src: "mx" }, "4H": { seg: 14400, src: "mx" },
+  };
+  const cache = {};          // velas por par|tf
+  const trades = {};         // operaciones recibidas por par (para segundos y flujo)
 
   // ---------- formato ----------
   const dec = (p) => (!p || !isFinite(p)) ? 2 : Math.min(10, Math.max(2, 3 - Math.floor(Math.log10(Math.abs(p)))));
@@ -315,7 +350,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   const fecha = (iso, o) => new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }, o)).format(new Date(iso));
   const hora = (iso) => fecha(iso, { day: undefined, month: undefined });
   const hace = (iso) => { const m = Math.round((Date.now() - new Date(iso)) / 60000); if (m < 1) return "hace instantes"; if (m < 60) return `hace ${m} min`; const h = Math.floor(m / 60); return h < 24 ? `hace ${h} h ${m % 60} min` : `hace ${Math.floor(h / 24)} d`; };
-  const vol = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + " B" : v >= 1e6 ? (v / 1e6).toFixed(1) + " M" : (v || 0).toFixed(0);
+  const vol = (v) => v >= 1e9 ? (v / 1e9).toFixed(2) + " B" : v >= 1e6 ? (v / 1e6).toFixed(1) + " M" : v >= 1e3 ? (v / 1e3).toFixed(1) + " K" : (v || 0).toFixed(0);
   const base = (p) => p.replace("_USDT", "");
   const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const par = (p) => D.pares.find((x) => x.par === p);
@@ -328,6 +363,31 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   const ring = (k, n, color) => { const r = 19, c = 2 * Math.PI * r, f = n ? k / n : 0; return `<svg class="ring" width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="${r}" fill="none" stroke="var(--surface-2)" stroke-width="5"/><circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${c * f} ${c}" transform="rotate(-90 24 24)"/><text x="24" y="28" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" font-weight="600" fill="var(--fg)">${k}/${n}</text></svg>`; };
   const mejor = (p) => { const w = (e) => (e.senal && e.aprobada ? 3 : 0) + (e.aprobada ? 1 : 0) + e.cumplidas / e.total; return p.estrategias.slice().sort((a, b) => w(b) - w(a))[0]; };
   const estrategia = (p) => p.estrategias.find((e) => e.clave === estSel[p.par]) || mejor(p);
+
+  // ---------- indicadores ----------
+  const ema = (vals, n) => { const k = 2 / (n + 1); let e = null; return vals.map((v, i) => { e = e == null ? v : v * k + e * (1 - k); return i >= n - 1 ? e : null; }); };
+  function rsi(vals, n = 14) { let g = 0, l = 0; const out = [null]; for (let i = 1; i < vals.length; i++) { const d = vals[i] - vals[i - 1], up = Math.max(d, 0), dn = Math.max(-d, 0); if (i <= n) { g += up / n; l += dn / n; out.push(i === n ? 100 - 100 / (1 + g / (l || 1e-12)) : null); } else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n; out.push(100 - 100 / (1 + g / (l || 1e-12))); } } return out; }
+  function atr(v, n = 14) { let a = null; return v.map((x, i) => { const pc = i ? v[i - 1][4] : x[4]; const tr = Math.max(x[2] - x[3], Math.abs(x[2] - pc), Math.abs(x[3] - pc)); a = a == null ? tr : (a * (n - 1) + tr) / n; return a; }); }
+  function bollinger(c, n = 20, k = 2) { const up = [], lo = []; for (let i = 0; i < c.length; i++) { if (i < n - 1) { up.push(null); lo.push(null); continue; } const w = c.slice(i - n + 1, i + 1), m = w.reduce((a, b) => a + b, 0) / n, sd = Math.sqrt(w.reduce((a, b) => a + (b - m) ** 2, 0) / n); up.push(m + k * sd); lo.push(m - k * sd); } return { up, lo }; }
+  function vwap(v) { let dia = null, pv = 0, vv = 0; return v.map(([t, , h, l, c, q]) => { const d = Math.floor(t / 86400); if (d !== dia) { dia = d; pv = 0; vv = 0; } pv += (h + l + c) / 3 * (q || 0); vv += q || 0; return vv ? pv / vv : null; }); }
+  function macd(c) { const a = ema(c, 12), b = ema(c, 26), m = a.map((x, i) => x != null && b[i] != null ? x - b[i] : null); const first = m.findIndex((x) => x != null); const sg = first < 0 ? m.map(() => null) : m.slice(0, first).map(() => null).concat(ema(m.slice(first), 9)); return { m, sg, h: m.map((x, i) => x != null && sg[i] != null ? x - sg[i] : null) }; }
+  // Soportes y resistencias: pivotes agrupados por cercanía (0.6 ATR); fuerza = toques
+  function zonasSR(v) {
+    if (!v || v.length < 30) return { res: [], sop: [] };
+    const n = v.length > 200 ? 5 : 3, piv = [];
+    for (let i = n; i < v.length - n; i++) {
+      let hi = true, lo = true;
+      for (let j = i - n; j <= i + n; j++) { if (v[j][2] > v[i][2]) hi = false; if (v[j][3] < v[i][3]) lo = false; }
+      if (hi) piv.push(v[i][2]); if (lo) piv.push(v[i][3]);
+    }
+    const a = atr(v).slice(-1)[0], tol = 0.6 * a, precio = v[v.length - 1][4], gr = [];
+    piv.sort((x, y) => x - y).forEach((p) => { const g = gr[gr.length - 1]; if (g && p - g.media <= tol) { g.p.push(p); g.media = g.p.reduce((s, x) => s + x, 0) / g.p.length; } else gr.push({ p: [p], media: p }); });
+    const z = gr.filter((g) => g.p.length >= 2).map((g) => ({ precio: g.media, toques: g.p.length }));
+    return {
+      res: z.filter((x) => x.precio > precio).sort((x, y) => x.precio - y.precio).slice(0, 3),
+      sop: z.filter((x) => x.precio < precio).sort((x, y) => y.precio - x.precio).slice(0, 3),
+    };
+  }
 
   // ---------- estado ----------
   function pintarEstado() {
@@ -347,7 +407,7 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     $("strip").querySelectorAll(".pchip").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.par)));
   }
 
-  // ---------- cabecera del gráfico ----------
+  // ---------- cabecera ----------
   function pintarCabecera(p) {
     $("c-head").innerHTML = `
       <div class="c-title"><b>${esc(base(p.par))}<small>/USDT perpetuo · MEXC</small></b><span class="num">${px(precioDe(p.par))} <span class="${cls(p.cambio24)}">${pc(p.cambio24, 2)}</span></span></div>
@@ -366,45 +426,6 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const e = estrategia(p);
     return { e, lado: e.lado, entrada: e.plan.entrada, stop: e.plan.stop, objetivo: e.plan.objetivo, nombre: e.nombre };
   }
-  function pintarPlan(p) {
-    const pl = planActivo(p), e = pl.e || p.estrategias.find((x) => x.nombre === pl.nombre) || mejor(p);
-    const c = D.config, precio = precioDe(p.par);
-    const riesgo = Math.abs(pl.entrada - pl.stop), ganancia = Math.abs(pl.objetivo - pl.entrada);
-    const costo = (c.comision + c.deslizamiento) * 2 * pl.entrada;
-    const cant = c.riesgo_usd / (riesgo + costo), nocional = cant * pl.entrada;
-    let titulo, texto, color;
-    if (pl.activa) { titulo = "Señal activa"; texto = `Abierta ${hace(pl.activa.creada)} · ${(pl.activa.real || {}).estado === "abierta" ? "operando en real" : "seguimiento en papel"}.`; color = "var(--up)"; }
-    else if (e.senal && e.aprobada) { titulo = "Lista para operar"; texto = "Se cumplen todas las condiciones y la estrategia tiene ventaja comprobada."; color = "var(--up)"; }
-    else if (e.aprobada) { titulo = `En formación · faltan ${e.total - e.cumplidas}`; texto = "Estrategia con ventaja comprobada. Avisará cuando se cumplan todas las condiciones."; color = "var(--accent)"; }
-    else { titulo = "Solo referencia"; texto = "Esta estrategia no tiene ventaja estadística en este par: el bot no la opera."; color = "var(--faint)"; }
-    const pctS = riesgo / pl.entrada, pctT = ganancia / pl.entrada;
-    $("plan").innerHTML = `
-      <div><div class="label" style="margin-bottom:8px">Estrategia</div><div class="stabs">${p.estrategias.map((x) => `<button class="stab" type="button" data-k="${x.clave}" aria-pressed="${x.clave === e.clave && !pl.activa}"><span>${esc(x.nombre)}</span>${segs(x)}</button>`).join("")}</div></div>
-      <div class="verdict">${ring(pl.activa ? e.total : e.cumplidas, e.total, color)}<div><b>${titulo}</b><p>${texto}</p></div></div>
-      ${pl.activa ? "" : `<div><div class="label" style="margin-bottom:10px">Para ser señal confirmada se necesitan las dos</div>${requisitos(p, e)}</div>`}
-      <div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">${ladoChip(pl.lado)}<span class="muted" style="font-size:12px">${esc(pl.nombre)}</span></div>
-        <div class="ladder">
-          <span class="tick" style="background:var(--up)"></span><span class="label">Objetivo</span><span class="num lv up">${px(pl.objetivo)}</span>
-          <span class="tick" style="background:var(--accent)"></span><span class="label">${pl.activa ? "Entrada" : "Entrada (precio actual)"}</span><span class="num lv">${px(pl.entrada)}</span>
-          <span class="tick" style="background:var(--down)"></span><span class="label">Stop</span><span class="num lv down">${px(pl.stop)}</span>
-        </div>
-        <div class="rr" title="Riesgo frente a beneficio"><i style="flex:${pctS / (pctS + pctT)}"></i><i style="flex:${pctT / (pctS + pctT)}"></i></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span class="down num">−${(pctS * 100).toFixed(2)}%</span><span class="muted">riesgo 1 : ${(ganancia / riesgo).toFixed(1)} beneficio</span><span class="up num">+${(pctT * 100).toFixed(2)}%</span></div>
-      </div>
-      <div class="kv">
-        <div><span class="label">Tamaño para $${c.riesgo_usd}</span><span class="num">${cant.toPrecision(4)} ${esc(base(p.par))}</span></div>
-        <div><span class="label">Margen a ${c.apalancamiento}x</span><span class="num">$${(nocional / c.apalancamiento).toFixed(2)}</span></div>
-        <div><span class="label">Si toca objetivo</span><span class="num up">${usd(c.riesgo_usd * (ganancia - costo) / riesgo)}</span></div>
-        <div><span class="label">Si toca stop</span><span class="num down">${usd(-c.riesgo_usd)}</span></div>
-      </div>
-      <div><div class="label">Condiciones ${e.cumplidas}/${e.total} · ${e.lado === 1 ? "para LONG" : "para SHORT"}</div>
-        <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
-      ${resultadosAnio(p, e)}`;
-    $("plan").querySelectorAll(".stab").forEach((b) => b.addEventListener("click", () => { estSel[p.par] = b.dataset.k; pintarEscena(); }));
-  }
-
-  // ---------- qué falta y resultados ----------
   function requisitos(p, e) {
     const g1 = e.cumplidas === e.total, g2 = e.aprobada, t = e.total_stats;
     const gan = e.ganadas ?? Math.round(t.n * t.acierto), per = t.n - gan;
@@ -417,6 +438,14 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       <li>${check(g1)}<div><b>1. Condiciones del mercado: ${e.cumplidas} de ${e.total}</b><span>${g1 ? "Se cumplen todas en la última vela cerrada." : "Falta: " + faltan.map(esc).join(" · ")}</span></div></li>
       <li>${check(g2)}<div><b>2. Ventaja comprobada: ${g2 ? "sí" : "no"}</b><span>${g2 ? `Ganó en el año y en los meses recientes (t = ${t.t.toFixed(1)}).` : `En ${t.n} operaciones del último año ganó ${gan} y perdió ${per}: ${R(t.exp_r)} por operación.`}</span></div></li>
     </ol><p class="concl">${concl}</p>`;
+  }
+  function nivelesPlan(p, pl) {
+    const z = zonasSR(p.velas), r1 = z.res[0], s1 = z.sop[0], precio = precioDe(p.par);
+    const fila = (t, x, c) => x ? `<div><span class="label">${t}</span><span class="num ${c}">${px(x.precio)}</span><span class="muted" style="font-size:12px">${pc((x.precio - precio) / precio, 2)} · ${x.toques} toques</span></div>` : `<div><span class="label">${t}</span><span class="muted">sin nivel cercano</span></div>`;
+    let aviso = "";
+    if (pl.lado === 1 && r1 && r1.precio < pl.objetivo) aviso = `Hay una resistencia antes del objetivo (en ${px(r1.precio)}): el precio podría frenarse ahí.`;
+    if (pl.lado === -1 && s1 && s1.precio > pl.objetivo) aviso = `Hay un soporte antes del objetivo (en ${px(s1.precio)}): el precio podría rebotar ahí.`;
+    return `<div><div class="label" style="margin-bottom:8px">Soportes y resistencias en 1H</div><div class="kv">${fila("Resistencia más cercana", r1, "down")}${fila("Soporte más cercano", s1, "up")}</div>${aviso ? `<p class="concl" style="margin-top:10px">⚠️ ${aviso}</p>` : ""}</div>`;
   }
   function spark(arr) {
     if (!arr || arr.length < 2) return "";
@@ -436,6 +465,44 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       </div>${spark(e.curva)}
       <div class="why">Resultado acumulado operación por operación, con comisiones. ${e.aprobada ? `Caída máxima ${t.dd_r.toFixed(1)}R.` : "Por eso no pasa el filtro: " + esc(e.motivos[0] || "")}</div></div>`;
   }
+  function pintarPlan(p) {
+    const pl = planActivo(p), e = pl.e || p.estrategias.find((x) => x.nombre === pl.nombre) || mejor(p);
+    const c = D.config;
+    const riesgo = Math.abs(pl.entrada - pl.stop), ganancia = Math.abs(pl.objetivo - pl.entrada);
+    const costo = (c.comision + c.deslizamiento) * 2 * pl.entrada;
+    const cant = c.riesgo_usd / (riesgo + costo), nocional = cant * pl.entrada;
+    let titulo, texto, color;
+    if (pl.activa) { titulo = "Señal activa"; texto = `Abierta ${hace(pl.activa.creada)} · ${(pl.activa.real || {}).estado === "abierta" ? "operando en real" : "seguimiento en papel"}.`; color = "var(--up)"; }
+    else if (e.senal && e.aprobada) { titulo = "Lista para operar"; texto = "Se cumplen todas las condiciones y la estrategia tiene ventaja comprobada."; color = "var(--up)"; }
+    else if (e.aprobada) { titulo = `En formación · faltan ${e.total - e.cumplidas}`; texto = "Estrategia con ventaja comprobada. Avisará cuando se cumplan todas las condiciones."; color = "var(--accent)"; }
+    else { titulo = "Solo referencia"; texto = "Esta estrategia no tiene ventaja estadística en este par: el bot no la opera."; color = "var(--faint)"; }
+    const pctS = riesgo / pl.entrada, pctT = ganancia / pl.entrada;
+    $("plan").innerHTML = `
+      <div><div class="label" style="margin-bottom:8px">Estrategia (análisis en 1H)</div><div class="stabs">${p.estrategias.map((x) => `<button class="stab" type="button" data-k="${x.clave}" aria-pressed="${x.clave === e.clave && !pl.activa}"><span>${esc(x.nombre)}</span>${segs(x)}</button>`).join("")}</div></div>
+      <div class="verdict">${ring(pl.activa ? e.total : e.cumplidas, e.total, color)}<div><b>${titulo}</b><p>${texto}</p></div></div>
+      ${pl.activa ? "" : `<div><div class="label" style="margin-bottom:10px">Para ser señal confirmada se necesitan las dos</div>${requisitos(p, e)}</div>`}
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">${ladoChip(pl.lado)}<span class="muted" style="font-size:12px">${esc(pl.nombre)}</span></div>
+        <div class="ladder">
+          <span class="tick" style="background:var(--up)"></span><span class="label">Objetivo</span><span class="num lv up">${px(pl.objetivo)}</span>
+          <span class="tick" style="background:var(--accent)"></span><span class="label">${pl.activa ? "Entrada" : "Entrada (precio actual)"}</span><span class="num lv">${px(pl.entrada)}</span>
+          <span class="tick" style="background:var(--down)"></span><span class="label">Stop</span><span class="num lv down">${px(pl.stop)}</span>
+        </div>
+        <div class="rr" title="Riesgo frente a beneficio"><i style="flex:${pctS / (pctS + pctT)}"></i><i style="flex:${pctT / (pctS + pctT)}"></i></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px"><span class="down num">−${(pctS * 100).toFixed(2)}%</span><span class="muted">riesgo 1 : ${(ganancia / riesgo).toFixed(1)} beneficio</span><span class="up num">+${(pctT * 100).toFixed(2)}%</span></div>
+      </div>
+      ${nivelesPlan(p, pl)}
+      <div class="kv">
+        <div><span class="label">Tamaño para $${c.riesgo_usd}</span><span class="num">${cant.toPrecision(4)} ${esc(base(p.par))}</span></div>
+        <div><span class="label">Margen a ${c.apalancamiento}x</span><span class="num">$${(nocional / c.apalancamiento).toFixed(2)}</span></div>
+        <div><span class="label">Si toca objetivo</span><span class="num up">${usd(c.riesgo_usd * (ganancia - costo) / riesgo)}</span></div>
+        <div><span class="label">Si toca stop</span><span class="num down">${usd(-c.riesgo_usd)}</span></div>
+      </div>
+      <div><div class="label">Condiciones ${e.cumplidas}/${e.total} · ${e.lado === 1 ? "para LONG" : "para SHORT"}</div>
+        <ul class="conds">${e.condiciones.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${check(ok)}<span>${esc(t)}</span></li>`).join("")}</ul></div>
+      ${resultadosAnio(p, e)}`;
+    $("plan").querySelectorAll(".stab").forEach((b) => b.addEventListener("click", () => { estSel[p.par] = b.dataset.k; pintarEscena(); }));
+  }
 
   // ---------- gráficos ----------
   const tema = () => ({
@@ -445,8 +512,9 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     timeScale: { borderColor: css("--line"), timeVisible: true, secondsVisible: false },
     crosshair: { horzLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") }, vertLine: { color: css("--faint"), labelBackgroundColor: css("--surface-2") } },
   });
-  const fmtT = (t) => new Intl.DateTimeFormat("es-EC", { timeZone: zona, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t * 1000));
-  const tick = (t, k) => new Intl.DateTimeFormat("es-EC", k <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : { timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(t * 1000));
+  const fmtT = (t) => new Intl.DateTimeFormat("es-EC", Object.assign({ timeZone: zona, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }, TF[tf].seg < 60 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
+  const tick = (t, k) => new Intl.DateTimeFormat("es-EC", k <= 2 ? { timeZone: zona, day: "2-digit", month: "short" } : Object.assign({ timeZone: zona, hour: "2-digit", minute: "2-digit", hour12: false }, k === 4 ? { second: "2-digit" } : {})).format(new Date(t * 1000));
+  const linea = (o) => ({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false, ...o });
   function crear() {
     if (chart) return true;
     if (!window.LightweightCharts) return false;
@@ -455,18 +523,20 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     chart.timeScale().applyOptions({ tickMarkFormatter: tick, rightOffset: 2 });
     sVol = chart.addHistogramSeries({ priceScaleId: "vol", priceFormat: { type: "volume" }, lastValueVisible: false, priceLineVisible: false });
     chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.86, bottom: 0 } });
-    sTP = chart.addBaselineSeries({ lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-    sSL = chart.addBaselineSeries({ lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    sTP = chart.addBaselineSeries(linea({ lineWidth: 1 })); sSL = chart.addBaselineSeries(linea({ lineWidth: 1 }));
+    sBBu = chart.addLineSeries(linea({ lineWidth: 1, lineStyle: 2 })); sBBl = chart.addLineSeries(linea({ lineWidth: 1, lineStyle: 2 }));
     sC = chart.addCandlestickSeries({ borderVisible: false });
-    sE20 = chart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-    sE50 = chart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
-    rsiChart = LC.createChart($("rsi"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
-    rsiChart.timeScale().applyOptions({ visible: false, rightOffset: 2 });
-    sRsi = rsiChart.addLineSeries({ lineWidth: 1.5, priceLineVisible: false });
+    sE20 = chart.addLineSeries(linea()); sE50 = chart.addLineSeries(linea()); sE200 = chart.addLineSeries(linea({ lineWidth: 2 }));
+    sVwap = chart.addLineSeries(linea({ lineWidth: 2, lineStyle: 1 }));
+    sub = LC.createChart($("rsi"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC" }, handleScroll: { vertTouchDrag: false } }));
+    sub.timeScale().applyOptions({ visible: false, rightOffset: 2 });
+    sHist = sub.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
+    sRsi = sub.addLineSeries({ lineWidth: 1.5, priceLineVisible: false });
+    sMacd = sub.addLineSeries(linea()); sSig = sub.addLineSeries(linea({ lineWidth: 1 }));
     sRsi.createPriceLine({ price: 70, color: css("--faint"), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     sRsi.createPriceLine({ price: 30, color: css("--faint"), lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
     const enlazar = (a, b) => a.timeScale().subscribeVisibleLogicalRangeChange((r) => { if (sync || !r) return; sync = true; b.timeScale().setVisibleLogicalRange(r); sync = false; });
-    enlazar(chart, rsiChart); enlazar(rsiChart, chart);
+    enlazar(chart, sub); enlazar(sub, chart);
     eqChart = LC.createChart($("equity"), Object.assign(tema(), { autoSize: true, localization: { timeFormatter: fmtT, locale: "es-EC", priceFormatter: (v) => v.toFixed(1) + "R" }, handleScroll: false, handleScale: false }));
     eqChart.timeScale().applyOptions({ tickMarkFormatter: tick });
     eqS = eqChart.addBaselineSeries({ baseValue: { type: "price", price: 0 }, lineWidth: 2, priceLineVisible: false });
@@ -475,54 +545,152 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
   }
   function colorear() {
     if (!chart) return;
-    [chart, rsiChart, eqChart].forEach((c) => c.applyOptions(tema()));
+    [chart, sub, eqChart].forEach((c) => c.applyOptions(tema()));
     sC.applyOptions({ upColor: css("--up"), downColor: css("--down"), wickUpColor: css("--up"), wickDownColor: css("--down") });
-    sE20.applyOptions({ color: css("--accent") }); sE50.applyOptions({ color: css("--ema50") });
-    sRsi.applyOptions({ color: css("--accent") });
-    // la zona se pinta igual hacia arriba o hacia abajo, así sirve para long y short
+    sE20.applyOptions({ color: css("--accent") }); sE50.applyOptions({ color: css("--ema50") }); sE200.applyOptions({ color: css("--ema200") });
+    sBBu.applyOptions({ color: css("--bb") }); sBBl.applyOptions({ color: css("--bb") }); sVwap.applyOptions({ color: css("--vwap") });
+    sRsi.applyOptions({ color: css("--accent") }); sMacd.applyOptions({ color: css("--ema50") }); sSig.applyOptions({ color: css("--accent") });
     const zona = (c, f) => ({ topFillColor1: f, topFillColor2: f, topLineColor: c, bottomFillColor1: f, bottomFillColor2: f, bottomLineColor: c });
     sTP.applyOptions(zona(css("--up"), css("--up-soft"))); sSL.applyOptions(zona(css("--down"), css("--down-soft")));
     eqS.applyOptions({ topLineColor: css("--up"), topFillColor1: css("--up-soft"), topFillColor2: "rgba(0,0,0,0)", bottomLineColor: css("--down"), bottomFillColor1: "rgba(0,0,0,0)", bottomFillColor2: css("--down-soft") });
   }
-  function ema(vals, n) { const k = 2 / (n + 1); let e = null, out = []; vals.forEach((v, i) => { e = e == null ? v : v * k + e * (1 - k); out.push(i >= n - 1 ? e : null); }); return out; }
-  function rsi(vals, n = 14) { let g = 0, l = 0, out = [null]; for (let i = 1; i < vals.length; i++) { const d = vals[i] - vals[i - 1]; const up = Math.max(d, 0), dn = Math.max(-d, 0); if (i <= n) { g += up / n; l += dn / n; out.push(i === n ? 100 - 100 / (1 + g / (l || 1e-12)) : null); } else { g = (g * (n - 1) + up) / n; l = (l * (n - 1) + dn) / n; out.push(100 - 100 / (1 + g / (l || 1e-12))); } } return out; }
-  function serie(p) {
-    if (tf === 1) return { v: p.velas, e20: p.ema20, e50: p.ema50, rsi: p.rsi_serie, paso: 3600 };
+
+  // ---------- velas por temporalidad ----------
+  function agrupar(v, seg) {
     const g = new Map();
-    p.velas.forEach(([t, o, h, l, c, vv]) => { const k = Math.floor(t / 14400) * 14400; const x = g.get(k); if (!x) g.set(k, [k, o, h, l, c, vv]); else { x[2] = Math.max(x[2], h); x[3] = Math.min(x[3], l); x[4] = c; x[5] += vv; } });
-    const v = [...g.values()], cl = v.map((x) => x[4]);
-    return { v, e20: ema(cl, 20), e50: ema(cl, 50), rsi: rsi(cl), paso: 14400 };
+    v.forEach(([t, o, h, l, c, q]) => { const k = Math.floor(t / seg) * seg, x = g.get(k); if (!x) g.set(k, [k, o, h, l, c, q]); else { x[2] = Math.max(x[2], h); x[3] = Math.min(x[3], l); x[4] = c; x[5] += q; } });
+    return [...g.values()];
   }
-  function pintarGrafico(p) {
+  const simboloBn = {};      // BTC_USDT -> { s: "BTCUSDT", f: 1 } o con prefijo 1000
+  async function binance(p, intervalo, limite = 500) {
+    const b = base(p);
+    const prueba = simboloBn[p] ? [simboloBn[p]] : [{ s: b + "USDT", f: 1 }, { s: "1000" + b + "USDT", f: 1000 }];
+    for (const c of prueba) {
+      try {
+        const r = await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${c.s}&interval=${intervalo}&limit=${limite}`);
+        if (!r.ok) continue;
+        const k = await r.json(); simboloBn[p] = c;
+        return k.map((x) => [x[0] / 1000, x[1] / c.f, x[2] / c.f, x[3] / c.f, x[4] / c.f, +x[7]]);
+      } catch (e) { /* sin conexión */ }
+    }
+    return null;
+  }
+  function velasTrades(p, seg) {
+    const tr = trades[p] || [], v = [];
+    tr.forEach(([t, precio, q]) => { const k = Math.floor(t / 1000 / seg) * seg, u = v[v.length - 1]; if (u && u[0] === k) { u[2] = Math.max(u[2], precio); u[3] = Math.min(u[3], precio); u[4] = precio; u[5] += q; } else v.push([k, precio, precio, precio, precio, q]); });
+    return v;
+  }
+  async function obtener(p, t) {
+    const cfg = TF[t];
+    if (cfg.src === "mx") return t === "1H" ? p.velas : agrupar(p.velas, 14400);
+    if (cfg.src === "mx_trades") return velasTrades(p.par, cfg.seg);
+    const k = p.par + "|" + t;
+    if (!cache[k]) cache[k] = await binance(p.par, cfg.bn);
+    return cache[k];
+  }
+
+  let token = 0, serieActual = [], ultimoIndic = 0;
+  async function pintarGrafico(p) {
     if (!crear()) { $("c-note").textContent = "No se pudo cargar la librería de gráficos. Revisa tu conexión."; return; }
-    const s = serie(p), d = dec(p.precio);
+    const mio = ++token, v = await obtener(p, tf);
+    if (mio !== token) return;
+    serieActual = v || [];
+    const d = dec(p.precio), cfg = TF[tf];
     sC.applyOptions({ priceFormat: { type: "price", precision: d, minMove: Math.pow(10, -d) } });
-    sC.setData(s.v.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
-    const linea = (arr) => s.v.map((x, i) => arr[i] == null ? { time: x[0] } : { time: x[0], value: arr[i] });
-    sE20.setData(vis.ema ? linea(s.e20) : []); sE50.setData(vis.ema ? linea(s.e50) : []);
-    sVol.setData(vis.vol ? s.v.map(([time, o, , , c, v]) => ({ time, value: v, color: c >= o ? css("--up-soft") : css("--down-soft") })) : []);
-    sRsi.setData(linea(s.rsi));
-    // entradas históricas
-    const tiempos = new Set(s.v.map((x) => x[0])), letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S" };
-    const marcas = vis.hist ? p.marcas.map((m) => ({ time: Math.floor(m.t / s.paso) * s.paso, position: m.lado === 1 ? "belowBar" : "aboveBar", color: m.r > 0 ? css("--up") : css("--down"), shape: m.lado === 1 ? "arrowUp" : "arrowDown", text: letra[m.clave] || "" })).filter((m) => tiempos.has(m.time)) : [];
-    D.activas.filter((a) => a.par === p.par).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / s.paso) * s.paso; if (tiempos.has(t)) marcas.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "ACTIVA" }); });
+    chart.timeScale().applyOptions({ secondsVisible: cfg.seg < 60 });
+    sC.setData(serieActual.map(([time, open, high, low, close]) => ({ time, open, high, low, close })));
+    indicadores(p);
+    // entradas históricas (solo tienen sentido en 1H y 4H)
+    const tiempos = new Set(serieActual.map((x) => x[0])), letra = { retroceso: "R", ruptura: "B", rebote_rsi: "S" };
+    const marcas = vis.hist && cfg.src === "mx" ? p.marcas.map((m) => ({ time: Math.floor(m.t / cfg.seg) * cfg.seg, position: m.lado === 1 ? "belowBar" : "aboveBar", color: m.r > 0 ? css("--up") : css("--down"), shape: m.lado === 1 ? "arrowUp" : "arrowDown", text: letra[m.clave] || "" })).filter((m) => tiempos.has(m.time)) : [];
+    D.activas.filter((a) => a.par === p.par).forEach((a) => { const t = Math.floor((new Date(a.t_entrada) / 1000 - 3600) / cfg.seg) * cfg.seg; if (tiempos.has(t)) marcas.push({ time: t, position: a.lado === 1 ? "belowBar" : "aboveBar", color: css("--accent"), shape: "circle", text: "ACTIVA" }); });
     sC.setMarkers(marcas.sort((a, b) => a.time - b.time));
-    // operación posible: zonas de ganancia y pérdida proyectadas a la derecha
-    lines.forEach((l) => sC.removePriceLine(l)); lines = [];
-    const pl = planActivo(p), ult = s.v[s.v.length - 1][0], n = tf === 1 ? 24 : 10;
-    if (vis.niveles) {
-      const fut = Array.from({ length: n + 1 }, (_, i) => ult + i * s.paso);
+    niveles(p);
+    const ver = cfg.src === "mx_trades" ? 120 : tf === "4H" ? 60 : 110, total = serieActual.length;
+    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - ver), to: total + (vis.niveles ? (cfg.src === "mx_trades" ? 12 : 18) : 2) });
+    nota(p);
+  }
+  function indicadores(p) {
+    const v = serieActual, c = v.map((x) => x[4]), l = (arr) => v.map((x, i) => arr[i] == null ? { time: x[0] } : { time: x[0], value: arr[i] });
+    sE20.setData(vis.ema ? l(ema(c, 20)) : []); sE50.setData(vis.ema ? l(ema(c, 50)) : []); sE200.setData(vis.ema ? l(ema(c, 200)) : []);
+    const bb = vis.bb ? bollinger(c) : null; sBBu.setData(bb ? l(bb.up) : []); sBBl.setData(bb ? l(bb.lo) : []);
+    sVwap.setData(vis.vwap ? l(vwap(v)) : []);
+    sVol.setData(vis.vol ? v.map(([time, o, , , cc, q]) => ({ time, value: q, color: cc >= o ? css("--up-soft") : css("--down-soft") })) : []);
+    if (inferior === "rsi") { sRsi.setData(l(rsi(c))); sMacd.setData([]); sSig.setData([]); sHist.setData([]); }
+    else { const m = macd(c); sRsi.setData([]); sMacd.setData(l(m.m)); sSig.setData(l(m.sg)); sHist.setData(v.map((x, i) => m.h[i] == null ? { time: x[0] } : { time: x[0], value: m.h[i], color: m.h[i] >= 0 ? css("--up-soft") : css("--down-soft") })); }
+    ultimoIndic = Date.now();
+  }
+  function niveles(p) {
+    lines.forEach((x) => sC.removePriceLine(x)); lines = [];
+    const v = serieActual, cfg = TF[tf];
+    // soportes y resistencias de la temporalidad visible
+    const z = zonasSR(v);
+    if (vis.sr) {
+      z.res.forEach((x, i) => lines.push(sC.createPriceLine({ price: x.precio, color: css("--down"), lineWidth: Math.min(3, 1 + Math.floor(x.toques / 3)), lineStyle: 1, title: `R${i + 1} · ${x.toques}` })));
+      z.sop.forEach((x, i) => lines.push(sC.createPriceLine({ price: x.precio, color: css("--up"), lineWidth: Math.min(3, 1 + Math.floor(x.toques / 3)), lineStyle: 1, title: `S${i + 1} · ${x.toques}` })));
+    }
+    const ult = v.length ? v[v.length - 1][4] : precioDe(p.par);
+    $("srlist").innerHTML = (z.res.slice().reverse().map((x, i, a) => `<div class="srrow"><span class="chip short">R${a.length - i}</span><span class="num">${px(x.precio)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} toques</span></div>`).join("")
+      + `<div class="srrow now"><span class="chip accent">Precio</span><span class="num">${px(ult)}</span><span></span><span></span></div>`
+      + z.sop.map((x, i) => `<div class="srrow"><span class="chip long">S${i + 1}</span><span class="num">${px(x.precio)}</span><span class="muted">${pc((x.precio - ult) / ult, 2)}</span><span class="muted">${x.toques} toques</span></div>`).join("")) || '<span class="muted">Aún no hay suficientes velas.</span>';
+    // operación posible proyectada a la derecha
+    const pl = planActivo(p);
+    const auto = cfg.seg < 3600 ? () => null : (o) => o();
+    sTP.applyOptions({ autoscaleInfoProvider: auto }); sSL.applyOptions({ autoscaleInfoProvider: auto });
+    if (vis.niveles && v.length) {
+      const n = cfg.src === "mx_trades" ? 12 : 18, u = v[v.length - 1][0], fut = Array.from({ length: n + 1 }, (_, i) => u + i * cfg.seg);
       sTP.applyOptions({ baseValue: { type: "price", price: pl.entrada } }); sSL.applyOptions({ baseValue: { type: "price", price: pl.entrada } });
       sTP.setData(fut.map((time) => ({ time, value: pl.objetivo }))); sSL.setData(fut.map((time) => ({ time, value: pl.stop })));
       lines.push(sC.createPriceLine({ price: pl.objetivo, color: css("--up"), lineWidth: 1, lineStyle: 2, title: "Objetivo" }));
       lines.push(sC.createPriceLine({ price: pl.entrada, color: css("--accent"), lineWidth: 1, lineStyle: 0, title: pl.activa ? "Entrada" : "Entrada posible" }));
       lines.push(sC.createPriceLine({ price: pl.stop, color: css("--down"), lineWidth: 1, lineStyle: 2, title: "Stop" }));
     } else { sTP.setData([]); sSL.setData([]); }
-    // vista inicial: las últimas velas y espacio a la derecha para la proyección
-    const ver = tf === 1 ? 110 : 60, total = s.v.length;
-    chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, total - ver), to: total + (vis.niveles ? n : 2) });
-    $("legend").innerHTML = `${vis.ema ? '<span><i style="background:var(--accent)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span>' : ""}${vis.niveles ? '<span><i class="z" style="background:var(--up-soft);border:1px solid var(--up)"></i>zona de ganancia</span><span><i class="z" style="background:var(--down-soft);border:1px solid var(--down)"></i>zona de pérdida</span>' : ""}`;
-    $("c-note").innerHTML = (pl.activa ? "Zonas de la <b>señal activa</b>." : `Zonas de la operación posible de <b>${esc(pl.nombre)}</b> si se entrara ahora.`) + (vis.hist ? " Flechas: entradas que habría dado cada estrategia (verde ganó, rojo perdió; R retroceso, B ruptura, S rebote RSI)." : "");
+  }
+  function nota(p) {
+    const cfg = TF[tf], pl = planActivo(p);
+    const fuente = cfg.src === "mx_trades" ? `Velas de ${tf} armadas con cada operación de MEXC desde que abriste el panel (${(trades[p.par] || []).length} operaciones recibidas).`
+      : cfg.src === "bn" ? (serieActual.length ? `Historial de ${tf} tomado de Binance Futures como referencia de precio (MEXC no lo entrega al navegador); se actualiza cada pocos segundos.` : "No hay historial de referencia para este par en esta temporalidad.")
+      : "Velas de MEXC; la vela actual se mueve en vivo.";
+    const scalp = cfg.seg < 3600 ? ` Las señales automáticas solo se calculan en 1H: en temporalidades cortas la comisión de API (≈0.22% ida y vuelta) se come entre 0.4 y 1.2 veces lo que arriesgas por operación.` : "";
+    $("c-note").innerHTML = fuente + " " + (pl.activa ? "Zonas de la <b>señal activa</b>." : `Zonas de la operación posible de <b>${esc(pl.nombre)}</b> (calculada en 1H).`) + scalp;
+    const lg = [];
+    if (vis.ema) lg.push('<span><i style="background:var(--accent)"></i>EMA20</span><span><i style="background:var(--ema50)"></i>EMA50</span><span><i style="background:var(--ema200)"></i>EMA200</span>');
+    if (vis.bb) lg.push('<span><i style="background:var(--bb)"></i>Bollinger 20/2</span>');
+    if (vis.vwap) lg.push('<span><i style="background:var(--vwap)"></i>VWAP</span>');
+    if (vis.sr) lg.push('<span><i style="background:var(--down)"></i>R resistencia</span><span><i style="background:var(--up)"></i>S soporte</span>');
+    $("legend").innerHTML = lg.join("");
+    $("sublegend").textContent = inferior === "rsi" ? "RSI 14 · zonas 30 / 70" : "MACD 12/26/9";
+  }
+  // actualización en vivo de la última vela
+  function actualizarVela(b) {
+    if (!chart || !b) return;
+    const v = serieActual, u = v[v.length - 1];
+    if (u && u[0] === b[0]) v[v.length - 1] = b; else if (!u || b[0] > u[0]) v.push(b); else return;
+    sC.update({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] });
+    if (vis.vol) sVol.update({ time: b[0], value: b[5], color: b[4] >= b[1] ? css("--up-soft") : css("--down-soft") });
+    if (Date.now() - ultimoIndic > 2000) { const p = par(sel); if (p) { indicadores(p); if (!u || b[0] !== u[0]) niveles(p); } }
+  }
+  setInterval(async () => {          // 1m / 5m / 15m: refresco desde Binance
+    if (!D || !sel || TF[tf].src !== "bn") return;
+    const k = await binance(sel, TF[tf].bn, 2);
+    if (k && TF[tf].src === "bn") { k.forEach(actualizarVela); cache[sel + "|" + tf] = serieActual; }
+  }, 3000);
+
+  // ---------- flujo de órdenes ----------
+  let pendFlujo = false;
+  function pintarFlujo() {
+    if (pendFlujo) return; pendFlujo = true;
+    setTimeout(() => {
+      pendFlujo = false;
+      const tr = trades[sel] || [], ahora = Date.now(), ult = tr.filter((x) => ahora - x[0] <= 60000);
+      let c = 0, v = 0; ult.forEach((x) => { if (x[3] === 1) c += x[2]; else v += x[2]; });
+      const tot = c + v || 1;
+      $("pb").style.width = (c / tot * 100) + "%"; $("ps").style.width = (v / tot * 100) + "%";
+      $("pbt").textContent = `Compras ${Math.round(c / tot * 100)}%`; $("pst").textContent = `Ventas ${Math.round(v / tot * 100)}%`;
+      $("ptps").textContent = `${(ult.length / 60).toFixed(1)} operaciones/s`;
+      const tam = tr.slice(-300).map((x) => x[2]).sort((a, b) => a - b), grande = tam[Math.floor(tam.length * 0.95)] || Infinity;
+      $("tape").innerHTML = tr.slice(-40).reverse().map(([t, p, q, lado]) => `<div class="trow ${lado === 1 ? "b" : "s"} ${q >= grande ? "big" : ""}"><span class="num muted">${new Intl.DateTimeFormat("es-EC", { timeZone: zona, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(t))}.${String(t % 1000).padStart(3, "0")}</span><span class="num">${px(p)}</span><span class="num">${q.toLocaleString("en-US")}</span><span>${lado === 1 ? "compra" : "venta"}</span></div>`).join("") || '<span class="muted">Esperando operaciones…</span>';
+    }, 400);
   }
 
   // ---------- matriz ----------
@@ -603,7 +771,9 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     const c = D.config;
     $("p-cfg").innerHTML = `<div class="foot" style="color:var(--fg);font-size:13.5px">
       <p>Cada ${D.intervalo_min} minutos el sistema descarga de MEXC el último año de velas de 1 hora de las ${D.pares.length} criptomonedas con más volumen, recalcula tres estrategias y las prueba con costos reales: comisión ${(c.comision * 100).toFixed(2)}% y deslizamiento ${(c.deslizamiento * 100).toFixed(2)}% por lado.</p>
-      <p>La <b>operación posible</b> muestra dónde quedarían la entrada, el stop (${c.atr_stop} × ATR) y el objetivo (${c.ratio} veces el riesgo) si la estrategia se activara ahora. Es una referencia: solo se convierte en señal cuando se cumplen todas las condiciones <b>y</b> la estrategia pasa el filtro estadístico (gana en el primer 70% del año y en el 30% reciente, con t ≥ ${c.min_t}).</p>
+      <p>La <b>operación posible</b> muestra dónde quedarían la entrada, el stop (${c.atr_stop} × ATR) y el objetivo (${c.ratio} veces el riesgo) si la estrategia se activara ahora. Solo se convierte en señal cuando se cumplen todas las condiciones <b>y</b> la estrategia pasa el filtro estadístico (gana en el primer 70% del año y en el 30% reciente, con t ≥ ${c.min_t}).</p>
+      <p><b>Soportes y resistencias</b> se calculan con los máximos y mínimos de giro de la temporalidad que estás viendo, agrupados cuando están a menos de 0.6 ATR; el número indica cuántas veces el precio tocó esa zona. <b>Bollinger</b> (20, 2), <b>VWAP</b> diario, <b>EMA 20/50/200</b>, <b>RSI</b> y <b>MACD</b> se calculan en tu navegador sobre las velas visibles.</p>
+      <p><b>Temporalidades cortas:</b> las velas de segundos se arman con cada operación de MEXC en vivo; las de 1, 5 y 15 minutos usan el historial de Binance Futures como referencia. Sirven para analizar la entrada, pero el bot no genera señales ahí: con la comisión de API, el costo de ida y vuelta equivale a entre 0.4 y 1.2 veces lo que arriesgas por operación, y casi ninguna estrategia lo supera.</p>
       <p>El bot arriesga $${c.riesgo_usd} por operación con ${c.apalancamiento}x aislado, opera en papel hasta tener 30 señales cerradas con resultado positivo y nunca abre una posición que pueda superar los frenos diario y mensual.</p>
       <p class="muted">R es la unidad de riesgo: 1R es lo que pierdes si toca el stop.</p></div>`;
   }
@@ -611,14 +781,53 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
     document.querySelectorAll(".tab").forEach((x) => { const on = x === t; x.setAttribute("aria-selected", on); $(x.getAttribute("aria-controls")).hidden = !on; });
     if (t.id === "t-bt") pintarBacktest();
   }));
-  document.querySelectorAll("[data-tf]").forEach((b) => b.addEventListener("click", () => { tf = +b.dataset.tf; document.querySelectorAll("[data-tf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pintarGrafico(par(sel)); }));
+  document.querySelectorAll("[data-tf]").forEach((b) => b.addEventListener("click", () => { tf = b.dataset.tf; document.querySelectorAll("[data-tf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); pintarGrafico(par(sel)); }));
   document.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => { const k = b.dataset.t; vis[k] = !vis[k]; b.setAttribute("aria-pressed", vis[k]); pintarGrafico(par(sel)); }));
+  document.querySelectorAll("[data-inf]").forEach((b) => b.addEventListener("click", () => { inferior = b.dataset.inf; document.querySelectorAll("[data-inf]").forEach((x) => x.setAttribute("aria-pressed", x === b)); const p = par(sel); if (p) { indicadores(p); nota(p); } }));
+
+  // ---------- tiempo real (WebSocket público de MEXC) ----------
+  let ws, wsSym = null, ping, pend = false;
+  function refrescarPrecios() { if (pend) return; pend = true; setTimeout(() => { pend = false; pintarStrip(); pintarActivas(); const p = par(sel); if (p) pintarCabecera(p); }, 1000); }
+  function suscribir() {
+    if (!ws || ws.readyState !== 1 || !sel) return;
+    if (wsSym && wsSym !== sel) { ws.send(JSON.stringify({ method: "unsub.kline", param: { symbol: wsSym, interval: "Min60" } })); ws.send(JSON.stringify({ method: "unsub.deal", param: { symbol: wsSym } })); }
+    wsSym = sel; ws.send(JSON.stringify({ method: "sub.kline", param: { symbol: sel, interval: "Min60" } })); ws.send(JSON.stringify({ method: "sub.deal", param: { symbol: sel } }));
+  }
+  function velaHora(k) {
+    const p = par(k.symbol); if (!p) return;
+    const v = p.velas, nv = [k.t, k.o, k.h, k.l, k.c, k.q], u = v[v.length - 1];
+    if (u && u[0] === k.t) v[v.length - 1] = nv; else if (!u || k.t > u[0]) v.push(nv); else return;
+    if (k.symbol !== sel) return;
+    if (tf === "1H") actualizarVela(nv); else if (tf === "4H") { const g = agrupar(p.velas.slice(-8), 14400); actualizarVela(g[g.length - 1]); }
+  }
+  function operacion(sym, lista) {
+    const tr = trades[sym] || (trades[sym] = []);
+    lista.forEach((d) => tr.push([d.t, Number(d.p), Number(d.v), d.T]));
+    if (tr.length > 20000) tr.splice(0, tr.length - 20000);
+    if (sym !== sel) return;
+    pintarFlujo();
+    const cfg = TF[tf];
+    if (cfg.src === "mx_trades") { const v = velasTrades(sym, cfg.seg); if (!serieActual.length || v.length - serieActual.length > 1) { pintarGrafico(par(sel)); } else actualizarVela(v[v.length - 1]); }
+  }
+  function conectar() {
+    if (!D || (ws && ws.readyState <= 1)) return;
+    try { ws = new WebSocket("wss://contract.mexc.com/edge"); } catch (e) { return; }
+    ws.onopen = () => { wsOk = true; D.pares.forEach((p) => ws.send(JSON.stringify({ method: "sub.ticker", param: { symbol: p.par } }))); wsSym = null; suscribir(); ping = setInterval(() => { if (ws.readyState === 1) ws.send('{"method":"ping"}'); }, 15000); pintarEstado(); };
+    ws.onmessage = (m) => {
+      let j; try { j = JSON.parse(m.data); } catch (e) { return; }
+      if (j.channel === "push.ticker" && j.data) { vivo[j.data.symbol] = Number(j.data.lastPrice); const p = par(j.data.symbol); if (p && j.data.riseFallRate != null) p.cambio24 = Number(j.data.riseFallRate); refrescarPrecios(); }
+      else if (j.channel === "push.kline" && j.data) velaHora(j.data);
+      else if (j.channel === "push.deal" && j.data) operacion(j.symbol || (j.data[0] || {}).symbol || sel, Array.isArray(j.data) ? j.data : [j.data]);
+    };
+    ws.onclose = () => { wsOk = false; clearInterval(ping); pintarEstado(); setTimeout(conectar, 5000); };
+  }
+  $("refresh").addEventListener("click", () => cargar());
 
   // ---------- flujo ----------
-  function pintarEscena() { const p = par(sel); if (!p) return; pintarCabecera(p); pintarPlan(p); pintarGrafico(p); pintarMatriz(); }
+  function pintarEscena() { const p = par(sel); if (!p) return; pintarCabecera(p); pintarPlan(p); pintarGrafico(p); pintarMatriz(); pintarFlujo(); }
   function elegir(p, subir) {
     sel = p; $("strip").querySelectorAll(".pchip").forEach((b) => b.setAttribute("aria-pressed", b.dataset.par === p));
-    pintarEscena(); suscribirVelas();
+    pintarEscena(); suscribir();
     if (subir) document.querySelector(".stage").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   }
   function pintarTodo() {
@@ -631,39 +840,15 @@ table.t { width: 100%; border-collapse: collapse; font-size: 13px; }
       const r = await fetch("data/datos.json?t=" + Date.now(), { cache: "no-store" });
       if (!r.ok) throw new Error(r.status);
       const nuevo = await r.json();
-      if (!D || nuevo.generado !== D.generado) { D = nuevo; pintarTodo(); } else pintarEstado();
+      if (!D || nuevo.generado !== D.generado) { D = nuevo; pintarTodo(); suscribir(); } else pintarEstado();
     } catch (e) {
       if (!D) { $("status").innerHTML = '<span class="dot bad"></span><span>Sin datos todavía</span>'; $("plan").innerHTML = '<div class="empty"><b>Esperando la primera actualización.</b><span>Ejecuta el flujo “Radar MEXC” en la pestaña Actions de GitHub; en unos minutos el panel se llena solo.</span></div>'; }
     }
   }
-  // ---------- tiempo real (WebSocket público de MEXC) ----------
-  let ws, wsSym = null, ping, pend = false;
-  function refrescarPrecios() { if (pend) return; pend = true; setTimeout(() => { pend = false; pintarStrip(); pintarActivas(); const p = par(sel); if (p) pintarCabecera(p); }, 1000); }
-  function suscribirVelas() {
-    if (!ws || ws.readyState !== 1 || !sel) return;
-    if (wsSym && wsSym !== sel) ws.send(JSON.stringify({ method: "unsub.kline", param: { symbol: wsSym, interval: "Min60" } }));
-    wsSym = sel; ws.send(JSON.stringify({ method: "sub.kline", param: { symbol: sel, interval: "Min60" } }));
-  }
-  function velaViva(k) {
-    const p = par(k.symbol); if (!p || k.symbol !== sel || !chart) return;
-    const v = p.velas, nv = [k.t, k.o, k.h, k.l, k.c, k.q], u = v[v.length - 1];
-    if (u && u[0] === k.t) v[v.length - 1] = nv; else if (!u || k.t > u[0]) v.push(nv); else return;
-    const s = serie(p), b = s.v[s.v.length - 1];
-    sC.update({ time: b[0], open: b[1], high: b[2], low: b[3], close: b[4] });
-    if (vis.vol) sVol.update({ time: b[0], value: b[5], color: b[4] >= b[1] ? css("--up-soft") : css("--down-soft") });
-  }
-  function conectar() {
-    if (!D || (ws && ws.readyState <= 1)) return;
-    try { ws = new WebSocket("wss://contract.mexc.com/edge"); } catch (e) { return; }
-    ws.onopen = () => { wsOk = true; D.pares.forEach((p) => ws.send(JSON.stringify({ method: "sub.ticker", param: { symbol: p.par } }))); wsSym = null; suscribirVelas(); ping = setInterval(() => { if (ws.readyState === 1) ws.send('{"method":"ping"}'); }, 15000); pintarEstado(); };
-    ws.onmessage = (m) => { let j; try { j = JSON.parse(m.data); } catch (e) { return; } if (j.channel === "push.ticker" && j.data) { vivo[j.data.symbol] = Number(j.data.lastPrice); const p = par(j.data.symbol); if (p && j.data.riseFallRate != null) p.cambio24 = Number(j.data.riseFallRate); refrescarPrecios(); } else if (j.channel === "push.kline" && j.data) velaViva(j.data); };
-    ws.onclose = () => { wsOk = false; clearInterval(ping); pintarEstado(); setTimeout(conectar, 5000); };
-  }
-  $("refresh").addEventListener("click", () => cargar());
   new MutationObserver(() => { colorear(); if (D && sel) pintarGrafico(par(sel)); }).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { colorear(); if (D && sel) pintarGrafico(par(sel)); });
   cargar().then(conectar);
-  setInterval(cargar, 60000); setInterval(pintarEstado, 30000);
+  setInterval(cargar, 60000); setInterval(pintarEstado, 30000); setInterval(() => { if (sel) pintarFlujo(); }, 2000);
 })();
 </script>
 </body>
