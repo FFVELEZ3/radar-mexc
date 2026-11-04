@@ -153,7 +153,7 @@ FRANJAS = [
     ("EE.UU. (08:00–16:00)", lambda h, d: (h >= 13) & (h < 21)),
     ("Tarde-noche (16:00–19:00)", lambda h, d: h >= 21),
     ("Apertura de Londres (02:00–04:00)", lambda h, d: (h >= 7) & (h < 9)),
-    ("Apertura de Wall Street (08:30–10:30)", lambda h, d: (h >= 13) & (h < 16)),
+    ("Apertura de Wall Street (08:00–11:00)", lambda h, d: (h >= 13) & (h < 16)),
     ("Lunes a viernes", lambda h, d: d < 5),
     ("Fin de semana (sáb y dom)", lambda h, d: d >= 5),
     ("Lunes", lambda h, d: d == 0),
