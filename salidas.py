@@ -18,7 +18,7 @@ COSTO_LADO = C.COMISION_TAKER + C.DESLIZAMIENTO
 
 
 def tramos(modo=None):
-    if (modo or C.GESTION) == "fija":
+    if (modo or C.GESTION) == "fija":  # "auto" sin decidir aún: se muestra la escalonada
         return [(float(C.RATIO_BENEFICIO), 1.0)]
     return [(1.0, 0.5), (2.0, 0.3), (3.0, 0.2)]
 
@@ -102,9 +102,9 @@ class Posicion:
         return (bruto - costos) / self.riesgo
 
 
-def r_si_llega(lado, entrada, stop, riesgo, k):
+def r_si_llega(lado, entrada, stop, riesgo, k, modo=None):
     """R neto si el precio llega al objetivo k (0 = TP1) y después vuelve al stop vigente."""
-    p = Posicion(lado, entrada, stop, riesgo)
+    p = Posicion(lado, entrada, stop, riesgo, modo)
     obj = p.objetivos[k]
     p.vela(entrada, max(entrada, obj), min(entrada, obj), obj)
     if p.abierta:
