@@ -18,6 +18,7 @@ import datos
 import ejecutor
 import panel
 from mexc_privado import ClienteMexc
+import salidas
 import seguimiento
 import telegram
 from backtest import evaluar, niveles
@@ -112,46 +113,78 @@ def mensaje_senal(s, r, modo="simulado"):
     cantidad = C.RIESGO_POR_OPERACION_USD / (s["riesgo"] + costo)
     nocional = cantidad * entrada
     moneda = s["par"].split("_")[0]
+    objs, netos = s.get("objetivos") or [s["objetivo"]], s.get("r_neto") or []
+    reparto = [f for _, f in salidas.tramos(s.get("gestion", "fija"))]
     lineas = [
         f"{'🟢 LONG' if lado == 1 else '🔴 SHORT'} <b>{s['par']}</b> · 1h",
         f"Estrategia: {s['nombre']}",
         etiqueta,
         "",
-        f"Entrada: <b>{precio(entrada)}</b> (a mercado)",
-        f"Stop loss: <b>{precio(s['stop'])}</b> ({-dist * 100:+.2f}%)",
-        f"Take profit: <b>{precio(s['objetivo'])}</b> ({dist * C.RATIO_BENEFICIO * 100:+.2f}%)",
-        f"Riesgo/beneficio 1:{C.RATIO_BENEFICIO:g} · cierre por tiempo a las {int(C.VELAS_MAXIMAS)} h",
+        f"📍 Entrada: <b>{precio(entrada)}</b> (a mercado)",
+        f"   No entres si el precio ya pasó {precio(s['precio_limite'])}",
+    ]
+    for k, o in enumerate(objs):
+        neto = f" · neto {netos[k]:+.2f}R" if k < len(netos) else ""
+        cierra = f" · cierra {reparto[k] * 100:.0f}%" if len(objs) > 1 else ""
+        lineas.append(f"🎯 TP{k + 1}: <b>{precio(o)}</b> ({lado * (o - entrada) / entrada * 100:+.2f}%){cierra}{neto}")
+    lineas.append(f"🛑 Stop loss: <b>{precio(s['stop'])}</b> ({-dist * 100:+.2f}%) · −1R + comisiones")
+    if len(objs) > 1:
+        lineas.append("🔒 Al tocar TP1 el stop pasa a la entrada: desde ahí ya no puedes perder.")
+    lineas += [
+        f"⏱ Se cierra sola a las {int(C.VELAS_MAXIMAS)} h si no toca ni stop ni TP3",
         "",
-        f"Para arriesgar ${C.RIESGO_POR_OPERACION_USD:g}: {cantidad:.6g} {moneda} "
+        f"💵 Para arriesgar ${C.RIESGO_POR_OPERACION_USD:g}: {cantidad:.6g} {moneda} "
         f"(nocional ${nocional:,.0f}, margen ${nocional / C.APALANCAMIENTO:,.0f} "
         f"a {int(C.APALANCAMIENTO)}x)",
+        f"⚙️ Apalancamiento: usa {int(C.APALANCAMIENTO)}x. Máximo técnico {s.get('apal_max', '?')}x "
+        "(más arriba, la liquidación llega antes que el stop). Margen aislado.",
     ]
     if dist >= 0.8 / C.APALANCAMIENTO:
         lineas.append("⚠️ La liquidación quedaría cerca del stop. Baja el apalancamiento.")
+    tp = t.get("tp")
     lineas += [
         "",
         f"<b>Historial</b> ({r['dias']} días, con comisiones):",
         f"{t['n']} operaciones · acierto {pct(t['acierto'])} (mínimo probable {pct(t['acierto_min'])})",
+    ]
+    if tp and len(objs) > 1:
+        lineas.append(f"Llegaron a TP1 {pct(tp[0])} · TP2 {pct(tp[1])} · TP3 {pct(tp[2])}")
+    lineas += [
         f"Expectativa <b>{t['exp_r']:+.2f}R</b> · factor de beneficio {t['fb']:.2f} · t={t['t']:.1f}",
         f"Periodo reciente: {oos['n']} ops, {oos['exp_r']:+.2f}R · caída máxima {t['dd_r']:.1f}R",
-        "",
-        f"No entres si el precio ya pasó {precio(s['precio_limite'])}. "
-        f"Válida hasta las {hora_local(s['t_limite'])}.",
+        f"Válida para entrar hasta las {hora_local(s['t_limite'])}.",
     ]
     if url_panel():
         lineas.append(f'<a href="{url_panel()}">Abrir panel</a>')
     return "\n".join(lineas)
 
 
+def mensaje_tp(s, k):
+    lado = "LONG" if s["lado"] == 1 else "SHORT"
+    objs = s.get("objetivos") or [s["objetivo"]]
+    extra = " Stop movido a la entrada: la operación ya no puede perder." if k == 0 and len(objs) > 1 else ""
+    falta = f" Siguiente: TP{k + 2} {precio(objs[k + 1])}." if k + 1 < len(objs) else ""
+    return (f"🎯 <b>{s['par']}</b> {lado} alcanzó <b>TP{k + 1}</b> ({precio(objs[k])}).{extra}{falta}")
+
+
 def mensaje_cierre(s):
-    icono = {"objetivo": "✅", "stop": "⛔", "tiempo": "⏱"}[s["estado"]]
-    texto = {"objetivo": "alcanzó el objetivo", "stop": "tocó el stop",
-             "tiempo": "se cerró por tiempo"}[s["estado"]]
+    icono = {"objetivo": "✅", "stop": "⛔", "tiempo": "⏱", "protegida": "🔒"}.get(s["estado"], "•")
+    texto = {"objetivo": "alcanzó todos los objetivos", "stop": "tocó el stop",
+             "tiempo": "se cerró por tiempo",
+             "protegida": f"cerró en la entrada después de TP{s.get('tps', 1)}"}.get(s["estado"], s["estado"])
     lado = "LONG" if s["lado"] == 1 else "SHORT"
     usd = s["r"] * C.RIESGO_POR_OPERACION_USD
     return (f"{icono} <b>{s['par']}</b> {lado} {texto}\n"
-            f"{s['nombre']} · salida {precio(s['salida'])}\n"
+            f"{s['nombre']} · salida media {precio(s['salida'])}\n"
             f"Resultado: <b>{s['r']:+.2f}R</b> (≈ ${usd:+.2f} con tu riesgo por operación)")
+
+
+def mensaje_contraria(s, r):
+    nuevo = "LONG" if r["ultima_senal"] == 1 else "SHORT"
+    return (f"⚠️ <b>Señal contraria</b> en {s['par']}\n"
+            f"Tienes un {'LONG' if s['lado'] == 1 else 'SHORT'} activo ({s['nombre']}) y ahora "
+            f"«{r['nombre']}» marca {nuevo}{'' if r['m']['aprobada'] else ' (sin ventaja comprobada)'}.\n"
+            f"Resultado actual {s.get('r_actual', 0):+.2f}R. Revisa el panel; si ya tocó TP1 el stop está en la entrada.")
 
 
 def mensaje_resumen(resultados, rend, errores):
@@ -216,7 +249,11 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
 
     # 1. Seguimiento de señales abiertas
     precios = {p: v["precio"] for p, v in info.items()}
-    for s in seguimiento.actualizar(senales, por_par, precios):
+    cerradas_ahora, eventos = seguimiento.actualizar(senales, por_par, precios)
+    for s, k in eventos:
+        if not s.get("observacion") and s["id"] not in {c["id"] for c in cerradas_ahora}:
+            telegram.enviar(mensaje_tp(s, k))
+    for s in cerradas_ahora:
         if not s.get("observacion"):
             telegram.enviar(mensaje_cierre(s))
 
@@ -229,6 +266,15 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     for r in resultados:
         if r["ultima_senal"] == 0:
             continue
+        # señal contraria: otra estrategia apunta al lado opuesto de una señal activa
+        if ahora - (r["vela"] + timedelta(hours=1)) <= timedelta(minutes=90):
+            for a in senales:
+                if (a["estado"] == "activa" and not a.get("observacion") and a["par"] == r["par"]
+                        and a["lado"] == -r["ultima_senal"]):
+                    marca = f"{r['clave']}|{r['vela'].isoformat()}"
+                    if marca not in a.setdefault("contrarias", []):
+                        a["contrarias"].append(marca)
+                        telegram.enviar(mensaje_contraria(a, r))
         observacion = not r["m"]["aprobada"]  # sin ventaja: se sigue en papel, sin aviso ni dinero
         if (r["par"], r["clave"]) in abiertas:
             continue  # igual que el backtest: una operación a la vez por par y estrategia
