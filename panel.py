@@ -5,9 +5,16 @@ import os
 from datetime import timedelta
 
 import config as C
+from backtest import niveles
 from estrategias import CONDICIONES, condiciones_actuales
 
-VELAS_GRAFICO = 168  # 7 días de velas de 1h
+
+def _sig(x, n=7):
+    """Redondeo a n cifras significativas para aligerar el archivo."""
+    x = float(x)
+    return float(f"{x:.{n}g}") if math.isfinite(x) else None
+
+VELAS_GRAFICO = 336  # 14 días de velas de 1h (84 velas de 4h)
 
 
 def _limpio(x):
@@ -44,7 +51,10 @@ def resumen_par(par, d, resultados_par, info):
     estrategias, marcas = [], []
     for r in resultados_par:
         lado, conds = condiciones_actuales(CONDICIONES[r["clave"]][1], d)
+        stop, objetivo, riesgo = niveles(lado, float(u["close"]), float(u["atr"]))
         estrategias.append({
+            "plan": {"entrada": _sig(u["close"]), "stop": _sig(stop), "objetivo": _sig(objetivo),
+                     "riesgo_pct": riesgo / float(u["close"])},
             "clave": r["clave"], "nombre": r["nombre"], "aprobada": r["m"]["aprobada"],
             "motivos": r["m"]["motivos"], "lado": lado,
             "condiciones": conds, "cumplidas": sum(ok for _, ok in conds), "total": len(conds),
@@ -62,9 +72,11 @@ def resumen_par(par, d, resultados_par, info):
         "funding": info.get("funding", 0.0), "tendencia": _tendencia(d),
         "rsi": float(u["rsi"]), "adx": float(u["adx"]), "atr_pct": float(u["atr"] / u["close"]),
         "ultima_vela": int(d.index[-1].timestamp()),
-        "velas": [[ti, float(o), float(h), float(l), float(c)] for ti, o, h, l, c in
-                  zip(t, ventana["open"], ventana["high"], ventana["low"], ventana["close"])],
-        "ema20": ventana["ema20"].tolist(), "ema50": ventana["ema50"].tolist(),
+        "velas": [[ti, _sig(o), _sig(h), _sig(l), _sig(c), _sig(v, 4)] for ti, o, h, l, c, v in
+                  zip(t, ventana["open"], ventana["high"], ventana["low"], ventana["close"],
+                      ventana["vol"])],
+        "ema20": [_sig(x) for x in ventana["ema20"]], "ema50": [_sig(x) for x in ventana["ema50"]],
+        "rsi_serie": [_sig(x, 4) for x in ventana["rsi"]],
         "estrategias": estrategias, "marcas": marcas,
     }
 
