@@ -60,6 +60,38 @@ def tendencia_4h(df1h):
     return alineado[["c4", "ema50_4", "ema200_4"]]
 
 
+def _alinear(df1h, t, cols):
+    cierre_1h = df1h.index + pd.Timedelta(hours=1)
+    al = pd.merge_asof(pd.DataFrame({"k": cierre_1h}), t.reset_index(names="k"),
+                       on="k", direction="backward")
+    al.index = df1h.index
+    return al[cols]
+
+
+def marco_diario(df1h):
+    """Velas diarias (UTC) alineadas al 1h sin mirar al futuro: cada día se usa cuando ya cerró."""
+    agg = df1h.resample("1D", label="left", closed="left").agg(
+        {"open": "first", "high": "max", "low": "min", "close": "last", "vol": "count"})
+    agg = agg[agg["vol"] >= 23]
+    t = pd.DataFrame(index=agg.index + pd.Timedelta(days=1))
+    t["cd"] = agg["close"].values
+    t["ema20_d"] = ema(agg["close"], 20).values
+    t["ema50_d"] = ema(agg["close"], 50).values
+    t["pdh"] = agg["high"].values     # máximo del día anterior
+    t["pdl"] = agg["low"].values      # mínimo del día anterior
+    return _alinear(df1h, t, ["cd", "ema20_d", "ema50_d", "pdh", "pdl"])
+
+
+def marco_4h_extra(df1h):
+    agg = df1h.resample("4h", label="left", closed="left").agg(
+        {"close": "last", "vol": "count"})
+    agg = agg[agg["vol"] == 4]
+    t = pd.DataFrame(index=agg.index + pd.Timedelta(hours=4))
+    t["ema20_4"] = ema(agg["close"], 20).values
+    t["rsi4"] = rsi(agg["close"]).values
+    return _alinear(df1h, t, ["ema20_4", "rsi4"])
+
+
 def preparar(df):
     df = df.copy()
     df["ema20"] = ema(df["close"], 20)
@@ -70,4 +102,11 @@ def preparar(df):
     df["max20"] = df["high"].rolling(20).max().shift()
     df["min20"] = df["low"].rolling(20).min().shift()
     df = df.join(tendencia_4h(df))
+    df = df.join(marco_4h_extra(df)).join(marco_diario(df))
+    media = df["close"].rolling(20).mean()
+    desv = df["close"].rolling(20).std(ddof=0)
+    df["bb_sup"], df["bb_inf"] = media + 2 * desv, media - 2 * desv
+    df["bb_ancho"] = (4 * desv / media)
+    df["bb_pct"] = df["bb_ancho"].rolling(120).rank(pct=True)
+    df["vol_media"] = df["vol"].rolling(20).mean().shift()
     return df
