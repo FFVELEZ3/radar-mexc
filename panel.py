@@ -5,6 +5,7 @@ import os
 from datetime import timedelta
 
 import config as C
+import salidas
 from backtest import niveles
 from estrategias import CONDICIONES, condiciones_actuales
 
@@ -54,7 +55,12 @@ def resumen_par(par, d, resultados_par, info):
         stop, objetivo, riesgo = niveles(lado, float(u["close"]), float(u["atr"]))
         estrategias.append({
             "plan": {"entrada": _sig(u["close"]), "stop": _sig(stop), "objetivo": _sig(objetivo),
+                     "objetivos": [_sig(x) for x in salidas.objetivos(lado or 1, float(u["close"]), riesgo)],
+                     "r_neto": [round(salidas.r_si_llega(lado or 1, float(u["close"]), stop, riesgo, k), 2)
+                                for k in range(len(salidas.tramos()))],
+                     "apal_max": salidas.apalancamiento_max(riesgo / float(u["close"])),
                      "riesgo_pct": riesgo / float(u["close"])},
+            "alternativa": r["m"].get("alternativa"), "gestion": r["m"].get("gestion"),
             "clave": r["clave"], "nombre": r["nombre"], "aprobada": r["m"]["aprobada"],
             "motivos": r["m"]["motivos"], "lado": lado,
             "condiciones": conds, "cumplidas": sum(ok for _, ok in conds), "total": len(conds),
@@ -118,7 +124,8 @@ def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, err
             "comision": C.COMISION_TAKER, "deslizamiento": C.DESLIZAMIENTO,
             "atr_stop": C.ATR_STOP, "ratio": C.RATIO_BENEFICIO,
             "velas_max": C.VELAS_MAXIMAS, "min_t": C.MIN_T, "dias": C.DIAS_HISTORIA,
-            "zona": C.ZONA_HORARIA,
+            "zona": C.ZONA_HORARIA, "gestion": C.GESTION,
+            "tramos": [[r, f] for r, f in salidas.tramos()],
         },
         "pares": [resumen_par(p, por_par[p], [r for r in resultados if r["par"] == p],
                               info.get(p, {})) for p in pares if p in por_par],
