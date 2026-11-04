@@ -62,6 +62,8 @@ def resumen_par(par, d, resultados_par, info):
             "total_stats": _stats(r["m"]["total"]), "oos_stats": _stats(r["m"]["oos"]),
         })
         ops = r["m"]["ops"]
+        estrategias[-1]["curva"] = [round(x, 2) for x in ops["r"].cumsum()] if len(ops) else []
+        estrategias[-1]["ganadas"] = int((ops["r"] > 0).sum()) if len(ops) else 0
         if len(ops):
             for _, op in ops[ops["entrada_t"] >= inicio].iterrows():
                 marcas.append({"t": int(op["entrada_t"].timestamp()) - 3600, "lado": int(op["lado"]),
@@ -95,16 +97,17 @@ def curva_aprobadas(resultados):
 
 
 def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, errores,
-              demo=False, bot=None):
+              demo=False, bot=None, rendimiento_obs=None):
     backtest = [{
         "par": r["par"], "clave": r["clave"], "nombre": r["nombre"],
         "aprobada": r["m"]["aprobada"], "motivos": r["m"]["motivos"],
         "total": _stats(r["m"]["total"]), "ins": _stats(r["m"]["ins"]),
         "oos": _stats(r["m"]["oos"]),
     } for r in resultados]
-    activas = [s for s in senales if s["estado"] == "activa"]
+    activas = [s for s in senales if s["estado"] == "activa" and not s.get("observacion")]
+    observando = [s for s in senales if s["estado"] == "activa" and s.get("observacion")]
     cerradas = sorted((s for s in senales if s["estado"] != "activa"),
-                      key=lambda s: s.get("t_cierre", ""), reverse=True)[:100]
+                      key=lambda s: s.get("t_cierre", ""), reverse=True)[:150]
     return _limpio({
         "demo": demo,
         "generado": ahora.isoformat(),
@@ -120,6 +123,7 @@ def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, err
         "pares": [resumen_par(p, por_par[p], [r for r in resultados if r["par"] == p],
                               info.get(p, {})) for p in pares if p in por_par],
         "activas": activas, "historial": cerradas, "rendimiento": rendimiento,
+        "observando": observando, "rendimiento_obs": rendimiento_obs or {},
         "backtest": backtest, "curva": curva_aprobadas(resultados), "errores": errores,
         "bot": bot or {},
         "reales": sorted(({"par": s["par"], "lado": s["lado"], "nombre": s["nombre"],
