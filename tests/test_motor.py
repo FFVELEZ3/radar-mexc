@@ -44,7 +44,7 @@ def test_sin_mirar_al_futuro():
     corte = df.index[-301]
     for clave, (_, f) in ESTRATEGIAS.items():
         assert (f(base).loc[:corte] == f(nuevo).loc[:corte]).all(), f"{clave} usa datos futuros"
-    cols = ["c4", "ema50_4", "ema200_4", "ema20", "rsi", "atr", "cd", "ema50_d", "pdh", "pdl", "ema20_4", "bb_pct"]
+    cols = ["c4", "ema50_4", "ema200_4", "ema20", "rsi", "atr", "cd", "ema50_d", "pdh", "pdl", "ema20_4", "bb_pct", "sop", "sop_toques", "res", "res_toques"]
     pd.testing.assert_frame_equal(base.loc[:corte, cols], nuevo.loc[:corte, cols])
     print("OK sin mirar al futuro")
 

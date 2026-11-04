@@ -130,6 +130,26 @@ def cond_compresion(d):
     return largo, corto
 
 
+def cond_zona(d):
+    """Rebote en soporte/resistencia: zona con 2+ toques en 10 días, vela de rechazo y RSI agotado."""
+    rango = (d["high"] - d["low"]).replace(0, np.nan)
+    largo = {
+        "Soporte con 2+ toques (10 días)": d["sop_toques"] >= 2,
+        "Tocó el soporte": d["low"] <= d["sop"] + 0.25 * d["atr"],
+        "Cerró sobre el soporte (no lo rompió)": d["close"] > d["sop"],
+        "Vela de rechazo (cierre en la mitad alta)": (d["close"] - d["low"]) / rango > 0.6,
+        "RSI agotado (< 40 en las últimas 3 velas)": d["rsi"].rolling(3).min() < 40,
+    }
+    corto = {
+        "Resistencia con 2+ toques (10 días)": d["res_toques"] >= 2,
+        "Tocó la resistencia": d["high"] >= d["res"] - 0.25 * d["atr"],
+        "Cerró bajo la resistencia (no la rompió)": d["close"] < d["res"],
+        "Vela de rechazo (cierre en la mitad baja)": (d["high"] - d["close"]) / rango > 0.6,
+        "RSI agotado (> 60 en las últimas 3 velas)": d["rsi"].rolling(3).max() > 60,
+    }
+    return largo, corto
+
+
 def _todas(conds):
     return pd.concat([s.fillna(False).astype(bool) for s in conds.values()], axis=1).all(axis=1)
 
@@ -160,6 +180,7 @@ CONDICIONES = {
     "mtf": ("Arriba-abajo (D → 4h → 1h)", cond_mtf),
     "barrida": ("Barrida de liquidez", cond_barrida),
     "compresion": ("Compresión y ruptura", cond_compresion),
+    "zona": ("Rebote en soporte/resistencia", cond_zona),
 }
 
 ESTRATEGIAS = {k: (n, senal_desde(f)) for k, (n, f) in CONDICIONES.items()}

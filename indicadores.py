@@ -109,4 +109,60 @@ def preparar(df):
     df["bb_ancho"] = (4 * desv / media)
     df["bb_pct"] = df["bb_ancho"].rolling(120).rank(pct=True)
     df["vol_media"] = df["vol"].rolling(20).mean().shift()
+    df = df.join(zonas_causales(df))
     return df
+
+
+def zonas_causales(df, k=5, ventana=240, tol=0.5):
+    """Soportes y resistencias sin mirar al futuro.
+
+    Un pivote (mínimo o máximo local de 2k+1 velas) solo se conoce k velas después.
+    En cada vela se buscan los pivotes confirmados de los últimos `ventana` periodos
+    (240 h = 10 días) que siguen vigentes (ningún cierre los rompió por más de
+    `tol` ATR) y se agrupan los que están a menos de `tol` ATR entre sí. Se devuelve
+    la zona más cercana al precio a la que llegó la vela, con su número de toques.
+    """
+    h, l, c, a = (df[x].to_numpy(float) for x in ("high", "low", "close", "atr"))
+    n = len(df)
+    sop, sop_t, res, res_t = (np.full(n, np.nan) for _ in range(4))
+    piv_l, piv_h = [], []          # [indice, precio, extremo de cierres desde la confirmacion]
+    for t in range(n):
+        j = t - k                   # el pivote en j se confirma ahora
+        if j - k >= 0:
+            if l[j] == l[j - k:j + k + 1].min():
+                piv_l.append([j, l[j], c[t]])
+            if h[j] == h[j - k:j + k + 1].max():
+                piv_h.append([j, h[j], c[t]])
+        piv_l = [p for p in piv_l if p[0] >= t - ventana]
+        piv_h = [p for p in piv_h if p[0] >= t - ventana]
+        at = a[t]
+        if not np.isfinite(at) or at <= 0:
+            for p in piv_l: p[2] = min(p[2], c[t])
+            for p in piv_h: p[2] = max(p[2], c[t])
+            continue
+        # soportes vigentes: ningun cierre previo quedo mas de tol ATR por debajo
+        vig = [p for p in piv_l if p[2] >= p[1] - tol * at]
+        mejor = None
+        for p in vig:
+            if not (p[1] - 1.5 * at <= l[t] <= p[1] + 0.25 * at):
+                continue
+            grupo = [q[1] for q in vig if abs(q[1] - p[1]) <= tol * at]
+            cand = (len(grupo), -abs(l[t] - p[1]), float(np.mean(grupo)))
+            if mejor is None or cand[:2] > mejor[:2]:
+                mejor = cand
+        if mejor:
+            sop_t[t], sop[t] = mejor[0], mejor[2]
+        vig = [p for p in piv_h if p[2] <= p[1] + tol * at]
+        mejor = None
+        for p in vig:
+            if not (p[1] - 0.25 * at <= h[t] <= p[1] + 1.5 * at):
+                continue
+            grupo = [q[1] for q in vig if abs(q[1] - p[1]) <= tol * at]
+            cand = (len(grupo), -abs(h[t] - p[1]), float(np.mean(grupo)))
+            if mejor is None or cand[:2] > mejor[:2]:
+                mejor = cand
+        if mejor:
+            res_t[t], res[t] = mejor[0], mejor[2]
+        for p in piv_l: p[2] = min(p[2], c[t])
+        for p in piv_h: p[2] = max(p[2], c[t])
+    return pd.DataFrame({"sop": sop, "sop_toques": sop_t, "res": res, "res_toques": res_t}, index=df.index)
