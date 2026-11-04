@@ -13,21 +13,22 @@ import numpy as np
 import pandas as pd
 
 import config as C
+from salidas import Posicion, objetivos
 
 
 def niveles(lado, entrada, atr):
+    """Stop, objetivo final y riesgo (distancia al stop)."""
     riesgo = C.ATR_STOP * atr
     stop = entrada - lado * riesgo
-    objetivo = entrada + lado * riesgo * C.RATIO_BENEFICIO
+    objetivo = objetivos(lado or 1, entrada, riesgo)[-1] if lado else entrada + riesgo * C.RATIO_BENEFICIO
     return stop, objetivo, riesgo
 
 
-def simular(d, senal):
+def simular(d, senal, modo=None):
     o, h, l, c = (d[k].to_numpy() for k in ("open", "high", "low", "close"))
     a = d["atr"].to_numpy()
     s = senal.to_numpy()
     idx = d.index
-    costo_lado = C.COMISION_TAKER + C.DESLIZAMIENTO
     ops = []
     i, n = 0, len(d)
     while i < n - 1:
@@ -37,37 +38,21 @@ def simular(d, senal):
             continue
         j = i + 1
         entrada = o[j]
-        stop, objetivo, riesgo = niveles(lado, entrada, a[i])
-        salida, k, motivo = None, j, None
-        while k < n and k - j < C.VELAS_MAXIMAS:
-            if lado == 1:
-                if k > j and o[k] <= stop:
-                    salida, motivo = o[k], "stop"
-                elif l[k] <= stop:
-                    salida, motivo = stop, "stop"
-                elif h[k] >= objetivo:
-                    salida, motivo = objetivo, "objetivo"
-            else:
-                if k > j and o[k] >= stop:
-                    salida, motivo = o[k], "stop"
-                elif h[k] >= stop:
-                    salida, motivo = stop, "stop"
-                elif l[k] <= objetivo:
-                    salida, motivo = objetivo, "objetivo"
-            if salida is not None:
+        stop, _, riesgo = niveles(lado, entrada, a[i])
+        pos = Posicion(int(lado), entrada, stop, riesgo, modo)
+        k, cerrada = j, False
+        while k < n:
+            if pos.vela(o[k], h[k], l[k], c[k]):
+                cerrada = True
                 break
             k += 1
-        if salida is None:
-            if k >= n:  # operación aún abierta al final de los datos: no se cuenta
-                break
-            k -= 1
-            salida, motivo = c[k], "tiempo"
-        bruto = lado * (salida - entrada)
-        costos = costo_lado * (entrada + salida)
+        if not cerrada:  # operación aún abierta al final de los datos: no se cuenta
+            break
+        r = pos.r()
         ops.append({
-            "entrada_t": idx[j], "lado": int(lado), "entrada": entrada, "salida": salida,
-            "motivo": motivo, "r": (bruto - costos) / riesgo,
-            "pct": (bruto - costos) / entrada,
+            "entrada_t": idx[j], "lado": int(lado), "entrada": entrada,
+            "salida": pos.salida_media, "motivo": pos.motivo, "tps": pos.hechos,
+            "r": r, "pct": r * riesgo / entrada,
         })
         i = k + 1
     return pd.DataFrame(ops)
@@ -134,4 +119,10 @@ def evaluar(d, senal):
     m["aprobada"] = not motivos
     m["motivos"] = motivos
     m["ops"] = ops
+    # comparación con la otra forma de salir (solo informativa: no decide la aprobación)
+    otro = "fija" if C.GESTION != "fija" else "escalonada"
+    m["alternativa"] = {"gestion": otro, **metricas(simular(d, senal, otro))}
+    m["gestion"] = C.GESTION
+    if len(ops):
+        m["total"]["tp"] = [float((ops["tps"] >= k).mean()) for k in (1, 2, 3)]
     return m
