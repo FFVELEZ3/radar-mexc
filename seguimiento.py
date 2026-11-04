@@ -8,6 +8,8 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 
 import config as C
+import salidas
+from salidas import Posicion
 
 COSTO_LADO = C.COMISION_TAKER + C.DESLIZAMIENTO
 
@@ -17,47 +19,46 @@ def resultado_r(s, salida):
     return (bruto - COSTO_LADO * (s["entrada"] + salida)) / s["riesgo"]
 
 
+def reproducir(s, barras):
+    """Recorre las velas desde la entrada con la misma gestión del backtest."""
+    pos = Posicion(s["lado"], s["entrada"], s["stop"], s["riesgo"], s.get("gestion", "fija"))
+    for t, b in barras.iterrows():
+        if pos.vela(b["open"], b["high"], b["low"], b["close"]):
+            return pos, t
+    return pos, None
+
+
 def actualizar(senales, velas, precios):
-    """Revisa las señales activas. Devuelve la lista de las que se cerraron ahora."""
-    cerradas = []
+    """Revisa las señales activas.
+
+    Devuelve (cerradas, eventos): las que se cerraron ahora y los objetivos parciales
+    alcanzados desde la revisión anterior (para avisar "TP1 alcanzado, stop a la entrada").
+    """
+    cerradas, eventos = [], []
     for s in senales:
         if s["estado"] != "activa":
             continue
         d = velas.get(s["par"])
+        pos = None
         if d is not None and len(d):
-            inicio = pd.Timestamp(s["t_entrada"])
-            barras = d[d.index >= inicio]
-            lado, stop, obj = s["lado"], s["stop"], s["objetivo"]
-            for n, (t, b) in enumerate(barras.iterrows()):
-                salida = motivo = None
-                if lado == 1:
-                    if n > 0 and b["open"] <= stop:
-                        salida, motivo = b["open"], "stop"
-                    elif b["low"] <= stop:
-                        salida, motivo = stop, "stop"
-                    elif b["high"] >= obj:
-                        salida, motivo = obj, "objetivo"
-                else:
-                    if n > 0 and b["open"] >= stop:
-                        salida, motivo = b["open"], "stop"
-                    elif b["high"] >= stop:
-                        salida, motivo = stop, "stop"
-                    elif b["low"] <= obj:
-                        salida, motivo = obj, "objetivo"
-                if salida is None and n + 1 >= C.VELAS_MAXIMAS:
-                    salida, motivo = b["close"], "tiempo"
-                if salida is not None:
-                    s.update(estado=motivo, salida=float(salida),
-                             r=round(resultado_r(s, salida), 3),
-                             t_cierre=(t + timedelta(hours=1)).isoformat())
-                    cerradas.append(s)
-                    break
-        if s["estado"] == "activa":
-            precio = precios.get(s["par"])
-            if precio:
-                s["precio_actual"] = precio
-                s["r_actual"] = round(resultado_r(s, precio), 3)
-    return cerradas
+            barras = d[d.index >= pd.Timestamp(s["t_entrada"])]
+            pos, t = reproducir(s, barras)
+            antes = s.get("tps", 0)
+            if pos.hechos > antes:
+                for k in range(antes, pos.hechos):
+                    eventos.append((s, k))
+            s["tps"] = pos.hechos
+            s["stop_actual"] = pos.stop
+            if t is not None:
+                s.update(estado=pos.motivo, salida=float(pos.salida_media),
+                         r=round(pos.r(), 3), t_cierre=(t + timedelta(hours=1)).isoformat())
+                cerradas.append(s)
+                continue
+        precio = precios.get(s["par"])
+        if precio:
+            s["precio_actual"] = precio
+            s["r_actual"] = round(pos.r(precio) if pos else resultado_r(s, precio), 3)
+    return cerradas, eventos
 
 
 def rendimiento(senales):
@@ -87,6 +88,12 @@ def nueva(r, niveles_fn, ahora=None):
         "atr": r["atr"], "t_entrada": t_entrada.isoformat(),
         "t_limite": (t_entrada + timedelta(hours=1)).isoformat(),
         "precio_limite": entrada + lado * C.MAX_DISTANCIA_ATR * r["atr"],
+        "gestion": C.GESTION,
+        "objetivos": salidas.objetivos(lado, entrada, riesgo),
+        "r_neto": [round(salidas.r_si_llega(lado, entrada, stop, riesgo, k), 2)
+                   for k in range(len(salidas.tramos()))],
+        "apal_max": salidas.apalancamiento_max(riesgo / entrada),
+        "tps": 0, "stop_actual": stop,
         "estado": "activa", "precio_actual": entrada, "r_actual": 0.0,
         "creada": (ahora or datetime.now(timezone.utc)).isoformat(),
         "stats": {k: r["m"]["total"][k] for k in ("n", "acierto", "exp_r", "fb", "t")},
