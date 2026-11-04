@@ -131,7 +131,9 @@ def mensaje_senal(s, r, modo="simulado"):
     if len(objs) > 1:
         lineas.append("🔒 Al tocar TP1 el stop pasa a la entrada: desde ahí ya no puedes perder.")
     lineas += [
-        f"⏱ Se cierra sola a las {int(C.VELAS_MAXIMAS)} h si no toca ni stop ni TP3",
+        f"⏱ Se cierra sola a las {int(C.VELAS_MAXIMAS)} h si no toca ni stop ni "
+        f"{'TP' + str(len(objs)) if len(objs) > 1 else 'el objetivo'}",
+        f"📐 Gestión elegida por el historial: {'3 objetivos' if len(objs) > 1 else '1 objetivo'}",
         "",
         f"💵 Para arriesgar ${C.RIESGO_POR_OPERACION_USD:g}: {cantidad:.6g} {moneda} "
         f"(nocional ${nocional:,.0f}, margen ${nocional / C.APALANCAMIENTO:,.0f} "
