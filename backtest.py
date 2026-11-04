@@ -143,3 +143,41 @@ def evaluar(d, senal):
     if len(ops):
         m["total"]["tp"] = [float((ops["tps"] >= k).mean()) for k in (1, 2, 3)]
     return m
+
+
+# ---------- efecto del horario y del día ----------
+# Horas en UTC (Ecuador = UTC-5). La entrada es la apertura de la vela siguiente a la señal.
+FRANJAS = [
+    ("Asia (19:00–02:00 Ecuador)", lambda h, d: (h >= 0) & (h < 7)),
+    ("Europa (02:00–08:00)", lambda h, d: (h >= 7) & (h < 13)),
+    ("EE.UU. (08:00–16:00)", lambda h, d: (h >= 13) & (h < 21)),
+    ("Tarde-noche (16:00–19:00)", lambda h, d: h >= 21),
+    ("Apertura de Londres (02:00–04:00)", lambda h, d: (h >= 7) & (h < 9)),
+    ("Apertura de Wall Street (08:30–10:30)", lambda h, d: (h >= 13) & (h < 16)),
+    ("Lunes a viernes", lambda h, d: d < 5),
+    ("Fin de semana (sáb y dom)", lambda h, d: d >= 5),
+    ("Lunes", lambda h, d: d == 0),
+    ("Viernes", lambda h, d: d == 4),
+]
+
+
+def por_horario(ops):
+    """Resultado por franja horaria y día, con la mitad antigua y la reciente por separado
+    para ver si el efecto se repite o fue casualidad de un periodo."""
+    if ops is None or not len(ops):
+        return []
+    t = pd.DatetimeIndex(ops["entrada_t"]).tz_convert("UTC")
+    h, d = t.hour.to_numpy(), t.dayofweek.to_numpy()
+    corte = t.min() + (t.max() - t.min()) * C.FRACCION_EN_MUESTRA
+    salida = []
+    for nombre, f in FRANJAS:
+        m = f(h, d)
+        sub = ops[m]
+        if not len(sub):
+            continue
+        tt = t[m]
+        mt, mi, mo = metricas(sub), metricas(sub[tt < corte]), metricas(sub[tt >= corte])
+        salida.append({"franja": nombre, "n": mt["n"], "exp_r": round(mt["exp_r"], 3), "t": round(mt["t"], 2),
+                       "exp_ins": round(mi["exp_r"], 3), "exp_oos": round(mo["exp_r"], 3), "n_oos": mo["n"],
+                       "consistente": bool(mt["t"] >= 2 and mi["exp_r"] > 0 and mo["exp_r"] > 0 and mo["n"] >= 15)})
+    return salida

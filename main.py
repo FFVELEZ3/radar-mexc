@@ -100,6 +100,9 @@ def analizar(info, pares, extra=()):
     return resultados, errores, por_par
 
 
+HORARIOS = {}
+
+
 def filtro_conjunto(resultados):
     """Filtro extra contra la suerte: con muchas combinaciones (pares x estrategias x gestión)
     alguna puede salir buena por azar. Solo se aprueba una estrategia en un par si, además,
@@ -111,6 +114,11 @@ def filtro_conjunto(resultados):
         if len(r["m"]["ops"]):
             por_clave.setdefault(r["clave"], []).append(r["m"]["ops"])
     conjunto = {k: metricas(pd.concat(v)) for k, v in por_clave.items()}
+    global HORARIOS
+    from backtest import por_horario
+    HORARIOS = {k: por_horario(pd.concat(v)) for k, v in por_clave.items()}
+    if por_clave:
+        HORARIOS["todas"] = por_horario(pd.concat([o for v in por_clave.values() for o in v]))
     for r in resultados:
         c = conjunto.get(r["clave"])
         r["m"]["conjunto"] = {k: c[k] for k in ("n", "exp_r", "t")} if c else None
@@ -375,7 +383,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 
