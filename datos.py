@@ -59,7 +59,8 @@ def tickers():
 # horarios y noticias distintos, y muchos tienen poco historial: se excluyen.
 NO_CRIPTO = {"XAU", "XAG", "GOLD", "SILVER", "PAXG", "XAUT", "COPPER", "OIL", "WTI", "BRENT",
              "NATGAS", "SOXL", "TQQQ", "SQQQ", "SPY", "QQQ", "NVDA", "TSLA", "AAPL", "MSFT",
-             "AMZN", "GOOGL", "META", "COIN", "MSTR", "HOOD", "CRCL"}
+             "AMZN", "GOOGL", "META", "COIN", "MSTR", "HOOD", "CRCL", "USOIL", "UKOIL",
+             "KORU", "EWY", "EWJ", "FXI", "GLD", "SLV", "USO", "UVXY", "TLT"}
 
 
 def es_cripto(simbolo):
