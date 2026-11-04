@@ -44,7 +44,7 @@ def test_sin_mirar_al_futuro():
     corte = df.index[-301]
     for clave, (_, f) in ESTRATEGIAS.items():
         assert (f(base).loc[:corte] == f(nuevo).loc[:corte]).all(), f"{clave} usa datos futuros"
-    cols = ["c4", "ema50_4", "ema200_4", "ema20", "rsi", "atr"]
+    cols = ["c4", "ema50_4", "ema200_4", "ema20", "rsi", "atr", "cd", "ema50_d", "pdh", "pdl", "ema20_4", "bb_pct"]
     pd.testing.assert_frame_equal(base.loc[:corte, cols], nuevo.loc[:corte, cols])
     print("OK sin mirar al futuro")
 
@@ -59,7 +59,7 @@ def test_simulacion_manual():
         "atr":   [1.0] * 5,
     }, index=idx)
     senal = pd.Series([1, 0, 0, 0, 0], index=idx)
-    op = backtest.simular(d, senal).iloc[0]
+    op = backtest.simular(d, senal, "fija").iloc[0]
     assert op["motivo"] == "objetivo" and op["salida"] == 103
     costo = (C.COMISION_TAKER + C.DESLIZAMIENTO) * (100 + 103)
     assert abs(op["r"] - (3 - costo) / 1.5) < 1e-9
@@ -67,13 +67,34 @@ def test_simulacion_manual():
     d2.iloc[2, d2.columns.get_loc("low")] = 98
     d2.iloc[2, d2.columns.get_loc("high")] = 104
     assert backtest.simular(d2, senal).iloc[0]["motivo"] == "stop"
+    # escalonada: TP1 101.5 (50 %), TP2 103 (30 %), TP3 104.5 (20 %)
+    op = backtest.simular(d, senal, "escalonada").iloc[0]
+    assert op["motivo"] == "objetivo" and op["tps"] == 3
+    assert abs(op["salida"] - (0.5 * 101.5 + 0.3 * 103 + 0.2 * 104.5)) < 1e-9
 
     # el seguimiento real usa las mismas reglas que el backtest
     s = {"par": "X", "lado": 1, "entrada": 100.0, "stop": 98.5, "objetivo": 103.0,
-         "riesgo": 1.5, "t_entrada": idx[1].isoformat(), "estado": "activa"}
+         "riesgo": 1.5, "gestion": "escalonada", "t_entrada": idx[1].isoformat(), "estado": "activa"}
     seguimiento.actualizar([s], {"X": d}, {})
     assert s["estado"] == "objetivo" and abs(s["r"] - op["r"]) < 1e-3
     print("OK simulación y seguimiento")
+
+
+def test_escalonada_protegida_y_prudencia():
+    from salidas import Posicion, COSTO_LADO
+    # Toca TP1 y luego vuelve a la entrada: la mitad gana 1R, el resto sale cubriendo comisiones
+    p = Posicion(1, 100.0, 98.5, 1.5, "escalonada")
+    # en la misma vela toca TP1 y vuelve bajo la entrada: se asume que tocó el stop protegido
+    assert p.vela(100, 101.6, 99.8, 101) and p.motivo == "protegida" and 0.4 < p.r() < 0.5
+    p2 = Posicion(1, 100.0, 98.5, 1.5, "escalonada")
+    assert not p2.vela(100, 101.6, 100.3, 101)    # TP1 sin volver a la entrada
+    assert p2.hechos == 1 and abs(p2.stop - (100 + COSTO_LADO * 200)) < 1e-9
+    assert p2.vela(101, 101.2, 100.0, 100.1)       # vuelve a la entrada: cierre protegido
+    assert p2.motivo == "protegida" and p2.r() > 0.4
+    # Stop y TP1 en la misma vela: cuenta como stop
+    p3 = Posicion(1, 100.0, 98.5, 1.5, "escalonada")
+    assert p3.vela(100, 101.6, 98.0, 100) and p3.motivo == "stop" and p3.r() < -1
+
 
 
 def test_flujo_completo():
@@ -85,8 +106,9 @@ def test_flujo_completo():
     main.ejecutar()
     with open(main.RUTA_PANEL, encoding="utf-8") as f:
         panel = json.load(f)
-    assert len(panel["pares"]) == 3 and len(panel["backtest"]) == 9
-    assert all(len(p["velas"]) == 168 for p in panel["pares"])
+    assert len(panel["pares"]) == 3 and len(panel["backtest"]) == 3 * len(ESTRATEGIAS)
+    assert all(len(p["velas"]) == 336 and len(p["velas"][0]) == 6 for p in panel["pares"])
+    assert all("plan" in e for p in panel["pares"] for e in p["estrategias"])
     main.ejecutar()  # una segunda corrida no duplica señales
     with open(main.RUTA_SENALES, encoding="utf-8") as f:
         ids = [s["id"] for s in json.load(f)["senales"]]
