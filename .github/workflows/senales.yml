@@ -2,18 +2,19 @@ name: Radar MEXC
 
 on:
   schedule:
-    - cron: "2,17,32,47 * * * *"   # cada 15 minutos
+    - cron: "7 */3 * * *"   # respaldo: reanuda el análisis continuo si se detuvo
   workflow_dispatch:
     inputs:
       modo:
-        description: "senales = analizar ahora · prueba = mensaje de prueba · backtest = solo reporte"
+        description: "continuo = analizar sin parar · senales = una sola vez · prueba = mensaje de prueba · backtest = solo reporte"
         required: true
-        default: senales
+        default: continuo
         type: choice
-        options: [senales, prueba, backtest]
+        options: [continuo, senales, prueba, backtest]
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: radar
@@ -22,7 +23,7 @@ concurrency:
 jobs:
   analizar:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 350
     env:
       TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
       TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -34,6 +35,8 @@ jobs:
       MEXC_API_KEY: ${{ secrets.MEXC_API_KEY }}
       MEXC_API_SECRET: ${{ secrets.MEXC_API_SECRET }}
       MODO: ${{ vars.MODO }}
+      INTERVALO_MIN: ${{ vars.INTERVALO_MIN }}
+      MODO_RUN: ${{ github.event.inputs.modo || 'continuo' }}
       MAX_POSICIONES: ${{ vars.MAX_POSICIONES }}
       LIMITE_PERDIDA_DIARIA: ${{ vars.LIMITE_PERDIDA_DIARIA }}
       LIMITE_PERDIDA_MENSUAL: ${{ vars.LIMITE_PERDIDA_MENSUAL }}
@@ -47,11 +50,22 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Analizar mercado
-        run: python main.py ${{ github.event.inputs.modo || 'senales' }}
+      - name: Análisis continuo (cada 5 minutos, ~5,6 horas)
+        if: env.MODO_RUN == 'continuo'
+        run: bash ciclo.sh
+
+      - name: Relanzar el análisis continuo
+        if: "!cancelled() && env.MODO_RUN == 'continuo'"
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run senales.yml --ref main -f modo=continuo
+
+      - name: Analizar una vez
+        if: env.MODO_RUN != 'continuo'
+        run: python main.py ${{ env.MODO_RUN }}
 
       - name: Publicar datos en el panel
-        if: always()
+        if: always() && env.MODO_RUN != 'continuo'
         run: |
           git config user.name "radar-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
