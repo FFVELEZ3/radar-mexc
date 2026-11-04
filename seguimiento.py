@@ -80,6 +80,8 @@ def nueva(r, niveles_fn, ahora=None):
     """Crea el registro de una señal a partir del resultado del análisis."""
     lado, entrada = r["ultima_senal"], r["cierre"]
     stop, objetivo, riesgo = niveles_fn(lado, entrada, r["atr"])
+    modo = r["m"].get("gestion") or ("escalonada" if C.GESTION == "auto" else C.GESTION)
+    objetivo = salidas.objetivos(lado, entrada, riesgo, modo)[-1]
     t_entrada = r["vela"] + timedelta(hours=1)
     return {
         "id": f"{r['par']}|{r['clave']}|{r['vela'].isoformat()}",
@@ -88,10 +90,10 @@ def nueva(r, niveles_fn, ahora=None):
         "atr": r["atr"], "t_entrada": t_entrada.isoformat(),
         "t_limite": (t_entrada + timedelta(hours=1)).isoformat(),
         "precio_limite": entrada + lado * C.MAX_DISTANCIA_ATR * r["atr"],
-        "gestion": C.GESTION,
-        "objetivos": salidas.objetivos(lado, entrada, riesgo),
-        "r_neto": [round(salidas.r_si_llega(lado, entrada, stop, riesgo, k), 2)
-                   for k in range(len(salidas.tramos()))],
+        "gestion": modo,
+        "objetivos": salidas.objetivos(lado, entrada, riesgo, modo),
+        "r_neto": [round(salidas.r_si_llega(lado, entrada, stop, riesgo, k, modo), 2)
+                   for k in range(len(salidas.tramos(modo)))],
         "apal_max": salidas.apalancamiento_max(riesgo / entrada),
         "tps": 0, "stop_actual": stop,
         "estado": "activa", "precio_actual": entrada, "r_actual": 0.0,
