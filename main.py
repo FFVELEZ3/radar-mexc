@@ -408,6 +408,11 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         s["r_actual"] = round(seguimiento.resultado_r(s, s["precio_actual"]), 3)
         s["observacion"] = observacion
         s["candidata"] = bool(observacion and r["m"].get("candidata"))
+        # misma entrada ya avisada por otra estrategia (p. ej. ruptura y ruptura del viernes): no repetir
+        repetida = any(o["par"] == s["par"] and o["lado"] == s["lado"] and o["t_entrada"] == s["t_entrada"]
+                       and (not o.get("observacion") or o.get("candidata")) for o in senales)
+        if repetida and s["candidata"]:
+            s["candidata"], s["duplicada"] = False, True
         senales.append(s)
         ids.add(s["id"])
         if not observacion:
