@@ -102,6 +102,7 @@ def analizar(info, pares, extra=()):
 
 
 HORARIOS = {}
+CANDIDATAS_INFO = {}
 
 
 def filtro_conjunto(resultados):
@@ -127,9 +128,15 @@ def filtro_conjunto(resultados):
         t = pd.DatetimeIndex(ops["entrada_t"])
         corte = t.min() + (t.max() - t.min()) * C.FRACCION_EN_MUESTRA
         mi, mo, mt = metricas(ops[t < corte]), metricas(ops[t >= corte]), conjunto[k]
-        if (mt["n"] >= C.MIN_OPS_CONJUNTO_CANDIDATA and mt["exp_r"] > 0 and mt["t"] >= C.MIN_T_CONJUNTO_CANDIDATA
-                and mi["exp_r"] > 0 and mo["exp_r"] > 0):
+        base = mt["n"] >= C.MIN_OPS_CONJUNTO_CANDIDATA and mt["exp_r"] > 0 and mi["exp_r"] > 0 and mo["exp_r"] > 0
+        # vía 1: muy distinguible del azar en todo el año
+        # vía 2: algo menos en el año, pero confirmada por sí sola en el periodo reciente con muchas
+        #        operaciones (el periodo reciente no se usó para elegir nada, es la prueba limpia)
+        via2 = mt["t"] >= 2.5 and mo["n"] >= 300 and mo["t"] >= 2.0
+        if base and (mt["t"] >= C.MIN_T_CONJUNTO_CANDIDATA or via2):
             candidatas.add(k)
+        CANDIDATAS_INFO[k] = {"t": round(mt["t"], 2), "exp_ins": round(mi["exp_r"], 3), "exp_oos": round(mo["exp_r"], 3),
+                              "n_oos": mo["n"], "t_oos": round(mo["t"], 2), "candidata": k in candidatas}
     for r in resultados:
         # en el par concreto tampoco debe perder (aunque tenga pocas operaciones para probarlo)
         r["m"]["candidata"] = (not r["m"]["aprobada"] and r["clave"] in candidatas
@@ -458,7 +465,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria, candidatas_info=CANDIDATAS_INFO))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 

@@ -107,7 +107,7 @@ def curva_aprobadas(resultados):
 
 
 def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, errores,
-              demo=False, bot=None, rendimiento_obs=None, horarios=None, grupos=None):
+              demo=False, bot=None, rendimiento_obs=None, horarios=None, grupos=None, candidatas_info=None):
     backtest = [{
         "par": r["par"], "clave": r["clave"], "nombre": r["nombre"],
         "aprobada": r["m"]["aprobada"], "motivos": r["m"]["motivos"],
@@ -136,7 +136,7 @@ def construir(ahora, pares, por_par, resultados, info, senales, rendimiento, err
                               info.get(p, {})) for p in pares if p in por_par],
         "activas": activas, "historial": cerradas, "rendimiento": rendimiento,
         "observando": observando, "rendimiento_obs": rendimiento_obs or {},
-        "backtest": backtest, "horarios": horarios or {}, "grupos": grupos, "curva": curva_aprobadas(resultados), "errores": errores,
+        "backtest": backtest, "horarios": horarios or {}, "grupos": grupos, "candidatas_info": candidatas_info or {}, "curva": curva_aprobadas(resultados), "errores": errores,
         "bot": bot or {},
         "reales": sorted(({"par": s["par"], "lado": s["lado"], "nombre": s["nombre"],
                            "senal": s["estado"], **s["real"]} for s in senales if s.get("real")),
