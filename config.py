@@ -37,6 +37,7 @@ RATIO_BENEFICIO = _num("RATIO_BENEFICIO", 2.0)  # take profit = 2 x distancia de
 # "auto": cada estrategia usa la que mejor funcionó en el 70 % antiguo del historial
 GESTION = os.getenv("GESTION", "auto").strip().lower() or "auto"
 VELAS_MAXIMAS = _num("VELAS_MAXIMAS", 48)  # cierre por tiempo: 48 velas de 1h
+VELAS_MAXIMAS_TENDENCIA = _num("VELAS_MAXIMAS_TENDENCIA", 120)  # modo tendencia: hasta 5 días
 
 # --- Tamaño de posición ---
 RIESGO_POR_OPERACION_USD = _num("RIESGO_POR_OPERACION_USD", 1.0)  # pérdida si toca el stop

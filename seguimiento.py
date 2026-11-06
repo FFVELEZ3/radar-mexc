@@ -48,6 +48,11 @@ def actualizar(senales, velas, precios):
                 for k in range(antes, pos.hechos):
                     eventos.append((s, k))
             s["tps"] = pos.hechos
+            avisado = s.get("stop_avisado", s["stop"])
+            # avisar para mover el stop en MEXC solo si se movió al menos 0.5R desde el último aviso
+            if s.get("gestion") == "tendencia" and s["lado"] * (pos.stop - avisado) >= 0.5 * s["riesgo"]:
+                eventos.append((s, "stop"))
+                s["stop_avisado"] = pos.stop
             s["stop_actual"] = pos.stop
             if t is not None:
                 s.update(estado=pos.motivo, salida=float(pos.salida_media),

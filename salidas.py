@@ -5,6 +5,11 @@ Modo "escalonada" (como los analistas profesionales, pero con buen riesgo/benefi
   TP2 a 2R cierra el 30 %
   TP3 a 3R cierra el 20 % restante
 Modo "fija": un solo objetivo a RATIO_BENEFICIO x riesgo.
+Modo "tendencia" (como los traders de tendencia: dejar correr las ganancias):
+  sin objetivo cercano; al ganar 1R el stop pasa a la entrada y desde 2R el stop
+  persigue al precio a 2R (3 ATR) del máximo alcanzado. Objetivo lejano de seguridad a 6R
+  y cierre por tiempo a las VELAS_MAXIMAS_TENDENCIA velas. El stop se mueve con las velas
+  ya cerradas (nunca con la vela en curso), así no hay ambigüedad de orden dentro de la vela.
 
 Supuestos prudentes, vela por vela:
 - Si la vela abre más allá del stop (hueco), se sale a la apertura.
@@ -18,6 +23,8 @@ COSTO_LADO = C.COMISION_TAKER + C.DESLIZAMIENTO
 
 
 def tramos(modo=None):
+    if (modo or C.GESTION) == "tendencia":
+        return [(6.0, 1.0)]
     if (modo or C.GESTION) == "fija":  # "auto" sin decidir aún: se muestra la escalonada
         return [(float(C.RATIO_BENEFICIO), 1.0)]
     return [(1.0, 0.5), (2.0, 0.3), (3.0, 0.2)]
@@ -35,6 +42,8 @@ def stop_protegido(lado, entrada):
 class Posicion:
     def __init__(self, lado, entrada, stop, riesgo, modo=None):
         self.lado, self.entrada, self.riesgo = lado, entrada, riesgo
+        self.modo = modo or C.GESTION
+        self.extremo = entrada   # mejor precio alcanzado en velas ya cerradas (modo tendencia)
         self.stop_inicial = self.stop = stop
         self.objetivos = objetivos(lado, entrada, riesgo, modo)
         self.fracciones = [f for _, f in tramos(modo)]
@@ -56,6 +65,13 @@ class Posicion:
             self.abierta = 0.0
             self.salida_media = self._suma_salidas
 
+    def _motivo_stop(self):
+        if self.hechos:
+            return "protegida"
+        if self.modo == "tendencia" and self.lado * (self.stop - self.stop_inicial) > 0:
+            return "seguimiento"   # salió por el stop dinámico, ya movido a favor
+        return "stop"
+
     def _contra(self, precio):     # ¿el precio está en o más allá del stop?
         return self.lado * (precio - self.stop) <= 0
 
@@ -66,13 +82,20 @@ class Posicion:
         primera = self.velas == 0
         self.velas += 1
         malo, bueno = (l, h) if self.lado == 1 else (h, l)
+        if self.modo == "tendencia" and not primera:
+            avance = self.lado * (self.extremo - self.entrada)
+            mejor = max if self.lado == 1 else min
+            if avance >= self.riesgo:
+                self.stop = mejor(self.stop, stop_protegido(self.lado, self.entrada))
+            if avance >= 2 * self.riesgo:
+                self.stop = mejor(self.stop, self.extremo - self.lado * 2 * self.riesgo)
         if not primera and self._contra(o):
             self._cerrar(self.abierta, o)
-            self.motivo = "protegida" if self.hechos else "stop"
+            self.motivo = self._motivo_stop()
             return True
         if self._contra(malo):
             self._cerrar(self.abierta, self.stop)
-            self.motivo = "protegida" if self.hechos else "stop"
+            self.motivo = self._motivo_stop()
             return True
         while self.hechos < len(self.objetivos) and self.lado * (bueno - self.objetivos[self.hechos]) >= 0:
             frac = self.fracciones[self.hechos] if self.hechos < len(self.objetivos) - 1 else self.abierta
@@ -87,7 +110,10 @@ class Posicion:
             self._cerrar(self.abierta, self.stop)
             self.motivo = "protegida"
             return True
-        if self.velas >= C.VELAS_MAXIMAS:
+        if self.modo == "tendencia":
+            self.extremo = max(self.extremo, h) if self.lado == 1 else min(self.extremo, l)
+        limite = C.VELAS_MAXIMAS_TENDENCIA if self.modo == "tendencia" else C.VELAS_MAXIMAS
+        if self.velas >= limite:
             self._cerrar(self.abierta, c)
             self.motivo = "tiempo"
             return True

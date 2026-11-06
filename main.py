@@ -173,6 +173,9 @@ def mensaje_senal(s, r, modo="simulado"):
     lineas.append(f"🛑 Stop loss: <b>{precio(s['stop'])}</b> ({-dist * 100:+.2f}%) · −1R + comisiones")
     if len(objs) > 1:
         lineas.append("🔒 Al tocar TP1 el stop pasa a la entrada: desde ahí ya no puedes perder.")
+    if s.get("gestion") == "tendencia":
+        lineas.append("🔁 Sin objetivo cercano: al ganar 1R el stop pasa a la entrada y desde 2R sigue al "
+                      "precio. Te aviso cada vez que debas mover el stop. TP de seguridad a 6R.")
     lineas += [
         f"⏱ Se cierra sola a las {int(C.VELAS_MAXIMAS)} h si no toca ni stop ni "
         f"{'TP' + str(len(objs)) if len(objs) > 1 else 'el objetivo'}",
@@ -212,10 +215,18 @@ def mensaje_tp(s, k):
     return (f"🎯 <b>{s['par']}</b> {lado} alcanzó <b>TP{k + 1}</b> ({precio(objs[k])}).{extra}{falta}")
 
 
+def mensaje_stop(s):
+    lado = "LONG" if s["lado"] == 1 else "SHORT"
+    protegida = s["lado"] * (s["stop_actual"] - s["entrada"]) >= 0
+    return (f"🔁 <b>{s['par']}</b> {lado}: mueve el stop a <b>{precio(s['stop_actual'])}</b>."
+            + (" La operación ya no puede perder." if protegida else "")
+            + f"\nPrecio actual {precio(s.get('precio_actual', s['entrada']))} · va {s.get('r_actual', 0):+.2f}R.")
+
+
 def mensaje_cierre(s):
-    icono = {"objetivo": "✅", "stop": "⛔", "tiempo": "⏱", "protegida": "🔒"}.get(s["estado"], "•")
+    icono = {"objetivo": "✅", "stop": "⛔", "tiempo": "⏱", "protegida": "🔒", "seguimiento": "✅"}.get(s["estado"], "•")
     texto = {"objetivo": "alcanzó todos los objetivos", "stop": "tocó el stop",
-             "tiempo": "se cerró por tiempo",
+             "tiempo": "se cerró por tiempo", "seguimiento": "salió por el stop dinámico",
              "protegida": f"cerró en la entrada después de TP{s.get('tps', 1)}"}.get(s["estado"], s["estado"])
     lado = "LONG" if s["lado"] == 1 else "SHORT"
     usd = s["r"] * C.RIESGO_POR_OPERACION_USD
@@ -249,7 +260,9 @@ def mensaje_candidata(s, r):
     return (f"🎯 <b>ENTRADA · {s['par']} {lado}</b>\n"
             f"🟡 Señal candidata (en validación) · {s['nombre']}\n\n"
             f"Entrada ≈ {precio(s['entrada'])}\nStop {precio(s['stop'])}\n"
-            + "\n".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs)) + "\n\n"
+            + "\n".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs))
+            + ("\n🔁 Stop dinámico: al ganar 1R pasa a la entrada y desde 2R sigue al precio; te aviso cada movimiento."
+               if s.get("gestion") == "tendencia" else "") + "\n\n"
             f"Por qué: en el año ganó {c.get('exp_r', 0):+.2f}R por operación sumando todos los pares "
             f"({c.get('n', 0)} ops, t={c.get('t', 0):.1f}), en la parte antigua y en la reciente. "
             f"En este par: {t['n']} ops, {t['exp_r']:+.2f}R (pocas para probarlo solo).\n"
@@ -346,7 +359,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     cerradas_ahora, eventos = seguimiento.actualizar(senales, por_par, precios)
     for s, k in eventos:
         if (not s.get("observacion") or s.get("candidata")) and s["id"] not in {c["id"] for c in cerradas_ahora}:
-            telegram.enviar(mensaje_tp(s, k))
+            telegram.enviar(mensaje_stop(s) if k == "stop" else mensaje_tp(s, k))
     for s in cerradas_ahora:
         if not s.get("observacion") or s.get("candidata"):
             telegram.enviar(mensaje_cierre(s))

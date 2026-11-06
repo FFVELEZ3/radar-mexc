@@ -153,3 +153,21 @@ def test_solo_lectura_bloquea_ordenes():
     modo, _, _ = ejecutor.decidir_modo([], True)
     assert modo in ("lectura", "simulado", "apagado")    # con claves y sin permiso, jamás "real"
     assert not any(m == "POST" for m, _ in ses.llamadas)
+
+
+def test_salida_de_tendencia():
+    from salidas import Posicion
+    # riesgo 1.5: sube hasta 106 (4R) y luego cae; el stop dinámico queda en 106 - 3 = 103
+    p = Posicion(1, 100.0, 98.5, 1.5, "tendencia")
+    velas = [(100, 101, 99.5, 100.8), (100.8, 102, 100.5, 101.8), (101.8, 104, 101.5, 103.8),
+             (103.8, 106, 103.5, 105.5), (105.5, 105.6, 104, 104.2), (104.2, 104.3, 102.5, 102.8)]
+    cerrada = False
+    for v in velas:
+        if p.vela(*v):
+            cerrada = True
+            break
+    assert cerrada and p.motivo == "seguimiento" and abs(p.salida_media - 103.0) < 1e-9
+    assert 1.8 < p.r() < 2.0
+    # una vela que sube a 4R y cae en la misma vela no mueve el stop en esa vela
+    q = Posicion(1, 100.0, 98.5, 1.5, "tendencia")
+    assert not q.vela(100, 106, 99, 99.2) and q.stop == 98.5

@@ -107,7 +107,7 @@ def evaluar(d, senal):
     Así la elección no usa información del periodo con el que se valida.
     """
     corte = d.index[0] + (d.index[-1] - d.index[0]) * C.FRACCION_EN_MUESTRA
-    modos = ["fija", "escalonada"] if C.GESTION == "auto" else [C.GESTION]
+    modos = ["fija", "escalonada", "tendencia"] if C.GESTION == "auto" else [C.GESTION]
     sims = {k: simular(d, senal, k) for k in modos}
     def exp_ins(k):
         ins_k = _partir(sims[k], corte)[0]
@@ -134,10 +134,12 @@ def evaluar(d, senal):
     m["motivos"] = motivos
     m["ops"] = ops
     # comparación con la otra forma de salir (informativa)
-    otro = "escalonada" if modo == "fija" else "fija"
+    otros = [k for k in sims if k != modo] or ["escalonada" if modo == "fija" else "fija"]
+    otro = max(otros, key=exp_ins) if all(k in sims for k in otros) else otros[0]
     alt = sims.get(otro)
     if alt is None:
         alt = simular(d, senal, otro)
+    m["por_gestion"] = {k: round(metricas(v)["exp_r"], 3) for k, v in sims.items()}
     m["alternativa"] = {"gestion": otro, **metricas(alt)}
     m["gestion"] = modo
     if len(ops):
