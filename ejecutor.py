@@ -23,7 +23,7 @@ import salidas
 from mexc_privado import ErrorMexc
 
 TZ = ZoneInfo(C.ZONA_HORARIA)
-COSTO_LADO = C.COMISION_TAKER + C.DESLIZAMIENTO
+COSTO_LADO = C.COMISION_API + C.DESLIZAMIENTO  # el bot opera por API: tarifa más alta
 
 
 # ---------- modo ----------

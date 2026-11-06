@@ -21,10 +21,13 @@ NUM_PARES = _num("NUM_PARES", 20)              # pares de mayor volumen a vigila
 DIAS_HISTORIA = _num("DIAS_HISTORIA", 365)     # historial para el backtest
 EXCLUIR = [s.strip().upper() for s in os.getenv("EXCLUIR", "USDC_USDT").split(",") if s.strip()]
 
-# --- Costos (MEXC futuros USDT-M operados por API, orden a mercado = taker) ---
-# Desde el 1/6/2026 las órdenes de futuros por API pagan 0.08 % taker
-# (anuncio oficial de MEXC). El backtest usa ese costo porque el bot opera por API.
-COMISION_TAKER = _num("COMISION_TAKER", 0.0008)   # 0.08 % por lado
+# --- Costos (MEXC futuros USDT-M, orden a mercado = taker) ---
+# Las señales las ejecuta Freddy a mano desde la app: la tarifa estándar de taker en
+# futuros USDT-M es 0.04 % por lado (algunas fuentes y promociones dan 0.02 %; se usa la
+# más alta). Las órdenes por API pagan 0.08 % desde el 1/6/2026: eso solo aplica al bot
+# automático (ejecutor.py usa COMISION_API).
+COMISION_TAKER = _num("COMISION_TAKER", 0.0004)   # 0.04 % por lado, operación manual
+COMISION_API = _num("COMISION_API", 0.0008)       # 0.08 % por lado, órdenes por API
 DESLIZAMIENTO = _num("DESLIZAMIENTO", 0.0003)     # 0.03 % por lado, prudente
 
 # --- Gestión de la operación ---
