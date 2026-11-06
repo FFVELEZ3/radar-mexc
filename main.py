@@ -246,8 +246,8 @@ def mensaje_candidata(s, r):
     t, c = r["m"]["total"], r["m"].get("conjunto") or {}
     objs = s.get("objetivos") or [s["objetivo"]]
     lado = "🟢 LONG" if s["lado"] == 1 else "🔴 SHORT"
-    return (f"🟡 <b>SEÑAL CANDIDATA</b> (en validación) · {s['par']} {lado}\n"
-            f"{s['nombre']}\n\n"
+    return (f"🎯 <b>ENTRADA · {s['par']} {lado}</b>\n"
+            f"🟡 Señal candidata (en validación) · {s['nombre']}\n\n"
             f"Entrada ≈ {precio(s['entrada'])}\nStop {precio(s['stop'])}\n"
             + "\n".join(f"TP{k + 1} {precio(o)}" for k, o in enumerate(objs)) + "\n\n"
             f"Por qué: en el año ganó {c.get('exp_r', 0):+.2f}R por operación sumando todos los pares "
@@ -401,7 +401,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     # 2b. Pre-aviso: estrategia con ventaja a una condición de completarse
     avisados = estado.setdefault("preavisos", [])
     for r in resultados:
-        if not r["m"]["aprobada"] or r["ultima_senal"]:
+        if not C.PREAVISOS or not r["m"]["aprobada"] or r["ultima_senal"]:
             continue
         lado, conds = condiciones_actuales(CONDICIONES[r["clave"]][1], por_par[r["par"]])
         faltan = [k for k, ok in conds if not ok]
