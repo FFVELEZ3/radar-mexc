@@ -379,6 +379,14 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
         if not s.get("observacion") or s.get("candidata"):
             telegram.enviar(mensaje_cierre(s))
 
+    # 1d. Cartera de tendencia diaria (entradas reales en velas de 1 día)
+    try:
+        import diario
+        tendencia_diaria = diario.procesar(pares, datetime.now(timezone.utc), telegram.enviar, precio)
+    except Exception as err:
+        print(f"[diario] error: {err}")
+        tendencia_diaria = None
+
     # 1c. Laboratorio de estrategias clásicas en diario y 4 h (se recalcula una vez al día)
     try:
         import lab
@@ -486,7 +494,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria, candidatas_info=CANDIDATAS_INFO, rotacion=ROTACION, lab=laboratorio))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria, candidatas_info=CANDIDATAS_INFO, rotacion=ROTACION, lab=laboratorio, diario=tendencia_diaria))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 

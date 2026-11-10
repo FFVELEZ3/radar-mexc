@@ -28,3 +28,16 @@ def test_reglas_de_seguimiento():
     assert misma_vela["motivo"] == "stop" and misma_vela["r"] < -1
     nunca = grupos.simular({**s, "entrada": 90, "stop": 88}, [(0, 101, 101, 99.5, 100.5)], 30 * 3600)
     assert nunca["estado"] == "no_activada"
+
+
+def test_laboratorio_sin_mirar_al_futuro():
+    import lab
+    from tests.test_motor import velas_simuladas
+    v = velas_simuladas(n=1200, semilla=5)
+    base = lab.preparar(v)
+    alt = v.copy()
+    alt.iloc[-200:, :4] *= 1.4
+    nuevo = lab.preparar(alt)
+    corte = v.index[-201]
+    for k, (_, f) in lab.LAB.items():
+        assert (f(base).loc[:corte] == f(nuevo).loc[:corte]).all(), f"{k} usa datos futuros"
