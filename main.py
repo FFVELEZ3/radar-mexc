@@ -103,6 +103,7 @@ def analizar(info, pares, extra=()):
 
 HORARIOS = {}
 CANDIDATAS_INFO = {}
+ROTACION = None
 
 
 def filtro_conjunto(resultados):
@@ -119,6 +120,13 @@ def filtro_conjunto(resultados):
     global HORARIOS
     from backtest import por_horario
     HORARIOS = {k: por_horario(pd.concat(v)) for k, v in por_clave.items()}
+    global ROTACION
+    from backtest import rotacion
+    try:
+        ROTACION = rotacion(por_clave)
+    except Exception as err:
+        print(f"[rotacion] {err}")
+        ROTACION = None
     if por_clave:
         HORARIOS["todas"] = por_horario(pd.concat([o for v in por_clave.values() for o in v]))
     # candidatas: ventaja en el conjunto, repetida en el periodo antiguo y en el reciente
@@ -470,7 +478,7 @@ def ejecutar(solo_reporte=False, ahora=None, demo=False):
     estado["senales"] = cerradas + [s for s in senales if s["estado"] == "activa"]
     panel.guardar(RUTA_SENALES, panel._limpio(estado))
     panel.guardar(RUTA_PANEL, panel.construir(
-        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria, candidatas_info=CANDIDATAS_INFO))
+        ahora, pares, por_par, resultados, info, estado["senales"], rend, errores, demo, bot, rend_obs, horarios=HORARIOS, grupos=auditoria, candidatas_info=CANDIDATAS_INFO, rotacion=ROTACION))
     print(f"Panel actualizado. Activas: {rend['activas']} · cerradas: {rend['n']}")
 
 

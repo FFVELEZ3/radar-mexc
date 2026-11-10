@@ -183,3 +183,57 @@ def por_horario(ops):
                        "exp_ins": round(mi["exp_r"], 3), "exp_oos": round(mo["exp_r"], 3), "n_oos": mo["n"],
                        "consistente": bool(mt["t"] >= 2 and mi["exp_r"] > 0 and mo["exp_r"] > 0 and mo["n"] >= 15)})
     return salida
+
+
+# ---------- rotación por régimen (prueba hacia adelante) ----------
+
+def rotacion(por_clave, mirar_dias=60, paso_dias=15, min_ops=30):
+    """¿Sirve operar solo las estrategias que vienen ganando?
+
+    Cada `paso_dias` se eligen las estrategias cuyo resultado sumando los pares en los
+    `mirar_dias` anteriores fue positivo (con al menos `min_ops` operaciones), y se mide qué
+    pasó con sus operaciones en los `paso_dias` siguientes. La elección solo usa el pasado:
+    es la misma decisión que se podría haber tomado en vivo. Devuelve el resultado de esa
+    regla y el de operar todo, para compararlos, y qué estrategias elige hoy.
+    """
+    tablas = []
+    for k, v in por_clave.items():
+        v = [x for x in v if x is not None and len(x)]
+        if not v:
+            continue
+        o = pd.concat(v)[["entrada_t", "r"]].copy()
+        o["clave"] = k
+        tablas.append(o)
+    if not tablas:
+        return None
+    ops = pd.concat(tablas)
+    ops["entrada_t"] = pd.DatetimeIndex(ops["entrada_t"]).tz_convert("UTC")
+    ops = ops.sort_values("entrada_t")
+    ini, fin = ops["entrada_t"].min() + pd.Timedelta(days=mirar_dias), ops["entrada_t"].max()
+    elegidas_r, todas_r, periodos = [], [], []
+    t = ini
+    while t < fin:
+        antes = ops[(ops["entrada_t"] >= t - pd.Timedelta(days=mirar_dias)) & (ops["entrada_t"] < t)]
+        despues = ops[(ops["entrada_t"] >= t) & (ops["entrada_t"] < t + pd.Timedelta(days=paso_dias))]
+        g = antes.groupby("clave")["r"].agg(["mean", "count"])
+        sel = list(g[(g["mean"] > 0) & (g["count"] >= min_ops)].index)
+        tomado = despues[despues["clave"].isin(sel)]["r"]
+        elegidas_r += tomado.tolist()
+        todas_r += despues["r"].tolist()
+        periodos.append({"desde": t.isoformat()[:10], "elegidas": sel, "n": int(len(tomado)), "r": round(float(tomado.sum()), 2)})
+        t += pd.Timedelta(days=paso_dias)
+    hoy = ops[ops["entrada_t"] >= fin - pd.Timedelta(days=mirar_dias)].groupby("clave")["r"].agg(["mean", "count"])
+    actuales = sorted(hoy[(hoy["mean"] > 0) & (hoy["count"] >= min_ops)].index.tolist())
+
+    def res(r):
+        r = pd.Series(r, dtype=float)
+        if not len(r):
+            return {"n": 0, "exp_r": 0.0, "t": 0.0, "total": 0.0}
+        sd = r.std(ddof=1) if len(r) > 1 else 0
+        return {"n": int(len(r)), "exp_r": round(float(r.mean()), 3), "total": round(float(r.sum()), 1),
+                "t": round(float(r.mean() / sd * len(r) ** 0.5), 2) if sd > 0 else 0.0}
+
+    positivos = sum(1 for p in periodos if p["r"] > 0)
+    return {"reglas": {"mirar_dias": mirar_dias, "paso_dias": paso_dias, "min_ops": min_ops},
+            "rotacion": res(elegidas_r), "todas": res(todas_r), "periodos": periodos,
+            "periodos_positivos": positivos, "actuales": actuales}
